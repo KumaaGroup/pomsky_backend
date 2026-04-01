@@ -6,9 +6,16 @@ require('dotenv').config();
 const app = express();
 
 app.use(cors({
-  origin: 'https://pomsky-association.design.webflow.com/', // your Webflow domain
-  credentials: true // required for cookies
+  origin: function(origin, callback) {
+    if (!origin || origin.endsWith('.webflow.com') || origin.endsWith('.webflow.io')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
 }));
+
 app.use(express.json());
 app.use(cookieParser());
 
