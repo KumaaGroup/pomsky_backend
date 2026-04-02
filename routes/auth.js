@@ -4,7 +4,16 @@ const supabase = require('../supabase');
 
 // REGISTER
 router.post('/register', async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, name, account_type } = req.body;
+
+  // account_type = 'breeder', 'owner', or 'shopper'
+  // membership always starts FREE
+
+  const defaultMembership = {
+    breeder: 'breeder_free',
+    owner: 'shopper',      // owner starts as shopper till they pay
+    shopper: 'shopper'
+  };
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -13,7 +22,21 @@ router.post('/register', async (req, res) => {
   });
 
   if (error) return res.status(400).json({ error: error.message });
-  res.json({ message: 'Check your email to confirm!', user: data.user });
+
+  // Save to profiles with FREE membership by default
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .insert({
+      id: data.user.id,
+      full_name: name,
+      email: email,
+      account_type: account_type || 'shopper',
+      membership_type: defaultMembership[account_type] || 'shopper'
+    });
+
+  if (profileError) return res.status(400).json({ error: profileError.message });
+
+  res.json({ message: 'Registered successfully!', user: data.user });
 });
 
 // LOGIN
