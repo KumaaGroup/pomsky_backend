@@ -14,28 +14,34 @@ router.post('/register', async (req, res) => {
     breeder: 'breeder_free'
   };
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.admin.createUser({
     email,
     password,
-    options: { data: { name } }
+    user_metadata: { name }
   });
 
   if (error) return res.status(400).json({ error: error.message });
-  if (!data.user || !data.user.id) {
-    return res.status(400).json({ error: 'User creation failed' });
+
+  const userId = data?.user?.id || data?.id;
+  if (!userId) {
+    console.error('Register: user created but no userId returned', data);
+    return res.status(500).json({ error: 'User creation failed' });
   }
 
   const { error: profileError } = await supabase
     .from('profiles')
     .insert({
-      id: data.user.id,
+      id: userId,
       full_name: name,
-      email: email,
+      email,
       account_type: account_type || 'shopper',
       membership_type: membership_type || freeTiers[account_type] || 'shopper_free'
     });
 
-  if (profileError) return res.status(400).json({ error: profileError.message });
+  if (profileError) {
+    console.error('Profile insert failed for userId:', userId, 'error:', profileError.message);
+    return res.status(400).json({ error: profileError.message });
+  }
 
   res.json({ message: 'Registered successfully!', user: data.user });
 });
