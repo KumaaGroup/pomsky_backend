@@ -6,15 +6,13 @@ const supabase = require('../supabase');
 router.post('/register', async (req, res) => {
   const { email, password, name, account_type } = req.body;
 
-  // account_type = 'breeder', 'owner', or 'shopper'
-  // membership always starts FREE
-
   const defaultMembership = {
     breeder: 'breeder_free',
-    owner: 'shopper',      // owner starts as shopper till they pay
+    owner: 'shopper',
     shopper: 'shopper'
   };
 
+  // Step 1: Create user in Supabase Auth
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -23,11 +21,16 @@ router.post('/register', async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message });
 
-  // Save to profiles with FREE membership by default
+  // Step 2: Make sure user ID exists before inserting profile
+  if (!data.user || !data.user.id) {
+    return res.status(400).json({ error: 'User creation failed, no ID returned' });
+  }
+
+  // Step 3: Insert profile using the confirmed user ID
   const { error: profileError } = await supabase
     .from('profiles')
     .insert({
-      id: data.user.id,
+      id: data.user.id,       // this must match auth.users id
       full_name: name,
       email: email,
       account_type: account_type || 'shopper',
