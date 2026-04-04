@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeSecretKey) {
+  throw new Error('Missing STRIPE_SECRET_KEY environment variable');
+}
+const stripe = require('stripe')(stripeSecretKey);
 const supabase = require('../supabase');
 
 router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
