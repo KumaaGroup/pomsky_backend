@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-if (!stripeSecretKey) {
-  throw new Error('Missing STRIPE_SECRET_KEY environment variable');
-}
-const stripe = require('stripe')(stripeSecretKey);
+const stripe = stripeSecretKey ? require('stripe')(stripeSecretKey) : null;
 const supabase = require('../supabase');
 
 router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe is not configured' });
+  }
   const sig = req.headers['stripe-signature'];
   let event;
 

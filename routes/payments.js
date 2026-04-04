@@ -1,10 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-if (!stripeSecretKey) {
-  throw new Error('Missing STRIPE_SECRET_KEY environment variable');
-}
-const stripe = require('stripe')(stripeSecretKey);
+const stripe = stripeSecretKey ? require('stripe')(stripeSecretKey) : null;
 const supabase = require('../supabase');
 const authMiddleware = require('../middleware/auth');
 
@@ -20,6 +17,10 @@ const PRICE_IDS = {
 
 // Create Stripe checkout session
 router.post('/create-checkout', authMiddleware, async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe is not configured' });
+  }
+
   const { membership_type } = req.body;
 
   if (!PRICE_IDS[membership_type]) {
