@@ -4,15 +4,9 @@ const supabase = require('../supabase');
 
 // REGISTER
 router.post('/register', async (req, res) => {
-  const { email, password, name, account_type, membership_type } = req.body;
+  const { email, password, name } = req.body;
 
-  const freeTiers = {
-    shopper: 'shopper_free',
-    owner:   'owner_free',
-    breeder: 'breeder_free'
-  };
-
-  // Step 1: Create auth user
+  // Supabase trigger will automatically create the profile
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -23,22 +17,6 @@ router.post('/register', async (req, res) => {
 
   if (!data.user || !data.user.id) {
     return res.status(500).json({ error: 'User creation failed' });
-  }
-
-  // Step 2: Create profile
-  const { error: profileError } = await supabase
-    .from('profiles')
-    .insert({
-      id: data.user.id,
-      full_name: name,
-      email,
-      account_type: account_type || 'shopper',
-      membership_type: membership_type || freeTiers[account_type] || 'shopper_free'
-    });
-
-  if (profileError) {
-    console.error('Profile insert error:', profileError.message);
-    return res.status(400).json({ error: profileError.message });
   }
 
   res.json({ message: 'Registered successfully!', user: data.user });
