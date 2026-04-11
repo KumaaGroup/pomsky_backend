@@ -4,20 +4,23 @@ const supabase = require('../supabase');
 
 // REGISTER
 router.post('/register', async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, name, account_type } = req.body;
 
-  // Supabase trigger will automatically create the profile
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { name } }
+    options: { 
+      data: { 
+        name,
+        account_type: account_type || 'shopper',
+        membership_type: account_type === 'breeder' ? 'breeder_free' : 
+                         account_type === 'owner' ? 'owner_free' : 'shopper_free'
+      } 
+    }
   });
 
   if (error) return res.status(400).json({ error: error.message });
-
-  if (!data.user || !data.user.id) {
-    return res.status(500).json({ error: 'User creation failed' });
-  }
+  if (!data.user) return res.status(500).json({ error: 'User creation failed' });
 
   res.json({ message: 'Registered successfully!', user: data.user });
 });
