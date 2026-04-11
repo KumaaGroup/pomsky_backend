@@ -3,35 +3,33 @@ const router = express.Router();
 const supabase = require('../supabase');
 
 // REGISTER
-// routes/auth.js
 router.post('/register', async (req, res) => {
   const { email, password, name, account_type, membership_type } = req.body;
 
-  // Default free memberships per account type
   const freeTiers = {
     shopper: 'shopper_free',
-    owner: 'owner_free',
+    owner:   'owner_free',
     breeder: 'breeder_free'
   };
 
-  const { data, error } = await supabase.auth.admin.createUser({
+  // Step 1: Create auth user
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    user_metadata: { name }
+    options: { data: { name } }
   });
 
   if (error) return res.status(400).json({ error: error.message });
 
-  const userId = data?.user?.id || data?.id;
-  if (!userId) {
-    console.error('Register: user created but no userId returned', data);
+  if (!data.user || !data.user.id) {
     return res.status(500).json({ error: 'User creation failed' });
   }
 
+  // Step 2: Create profile
   const { error: profileError } = await supabase
     .from('profiles')
     .insert({
-      id: userId,
+      id: data.user.id,
       full_name: name,
       email,
       account_type: account_type || 'shopper',
@@ -39,7 +37,7 @@ router.post('/register', async (req, res) => {
     });
 
   if (profileError) {
-    console.error('Profile insert failed for userId:', userId, 'error:', profileError.message);
+    console.error('Profile insert error:', profileError.message);
     return res.status(400).json({ error: profileError.message });
   }
 
@@ -50,14 +48,13 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
-  const { data, error } = await supabase.auth.signInWithPassword({ 
-    email, 
-    password 
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
   });
 
   if (error) return res.status(401).json({ error: error.message });
 
-  // Set cookie
   res.cookie('token', data.session.access_token, {
     httpOnly: true,
     secure: true,
@@ -65,21 +62,24 @@ router.post('/login', async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
-  // Send user data back so frontend doesn't need to fetch again
-  res.json({ 
-    message: 'Logged in!', 
+  res.json({
+    message: 'Logged in!',
     user: data.user,
-    redirect: '/dashboard' // tell frontend where to go
+    redirect: '/dashboard'
   });
 });
 
 // LOGOUT
 router.post('/logout', async (req, res) => {
-  res.clearCookie('token');
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None'
+  });
   res.json({ message: 'Logged out!' });
 });
 
-// GET CURRENT USER
+// GET CURRENT USER + PROFILE
 router.get('/me', async (req, res) => {
   const token = req.cookies.token;
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
@@ -87,7 +87,13 @@ router.get('/me', async (req, res) => {
   const { data, error } = await supabase.auth.getUser(token);
   if (error) return res.status(401).json({ error: 'Invalid token' });
 
-  res.json({ user: data.user });
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', data.user.id)
+    .single();
+
+  res.json({ user: data.user, profile });
 });
 
 module.exports = router;
