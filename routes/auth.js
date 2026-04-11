@@ -50,19 +50,27 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ 
+    email, 
+    password 
+  });
 
   if (error) return res.status(401).json({ error: error.message });
 
-  // Store token in httpOnly cookie (secure)
+  // Set cookie
   res.cookie('token', data.session.access_token, {
     httpOnly: true,
     secure: true,
     sameSite: 'None',
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
-  res.json({ message: 'Logged in!', user: data.user });
+  // Send user data back so frontend doesn't need to fetch again
+  res.json({ 
+    message: 'Logged in!', 
+    user: data.user,
+    redirect: '/dashboard' // tell frontend where to go
+  });
 });
 
 // LOGOUT
