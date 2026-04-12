@@ -3,28 +3,32 @@ const router = express.Router();
 const supabase = require('../supabase');
 const authMiddleware = require('../middleware/auth');
 
-// GET all dashboard data in one call
 router.get('/dashboard', authMiddleware, async (req, res) => {
   const userId = req.user.id;
 
-  // Get profile + membership info
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  // Get all data in parallel
+  const [profileResult, ordersResult, billingResult, shippingResult, paymentResult] = 
+    await Promise.all([
+      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+      supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('billing_addresses').select('*').eq('user_id', userId),
+      supabase.from('shipping_addresses').select('*').eq('user_id', userId),
+      supabase.from('payment_methods').select('*').eq('user_id', userId)
+    ]);
 
-  if (error) return res.status(400).json({ error: error.message });
+  const profile = profileResult.data;
 
   res.json({
-    user: {
-      name: profile.full_name,
-      email: profile.email,
-      account_type: profile.account_type,
-      membership_type: profile.membership_type,
-      membership_status: profile.membership_status,
-      created_at: profile.created_at
-    }
+    name: profile?.full_name || req.user.email,
+    email: profile?.email || req.user.email,
+    account_type: profile?.account_type || 'shopper',
+    membership_type: profile?.membership_type || 'shopper_free',
+    membership_status: profile?.membership_status || 'active',
+    created_at: profile?.created_at || new Date().toISOString(),
+    orders: ordersResult.data || [],
+    billing_addresses: billingResult.data || [],
+    shipping_addresses: shippingResult.data || [],
+    payment_methods: paymentResult.data || []
   });
 });
 
