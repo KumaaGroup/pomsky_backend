@@ -28,6 +28,7 @@ app.use('/auth', require('./routes/auth'));
 app.use('/api', require('./routes/api'));
 app.use('/membership', require('./routes/membership'));
 app.use('/user', require('./routes/user'));
+app.use('/admin', require('./routes/admin'));
 // app.use('/payments', require('./routes/payments'));
 
 app.listen(3000, () => console.log('Server running on port 3000'));
