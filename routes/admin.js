@@ -19,7 +19,6 @@ const adminAuth = async (req, res, next) => {
 
 // ── Admin Auth ──
 
-// Create first admin (run once, then disable)
 router.post('/setup', async (req, res) => {
   const { email, password, name, setup_key } = req.body;
 
@@ -39,7 +38,6 @@ router.post('/setup', async (req, res) => {
   res.json({ message: 'Admin created!', admin: { id: data.id, email: data.email } });
 });
 
-// Admin login
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -70,7 +68,6 @@ router.post('/login', async (req, res) => {
   res.json({ message: 'Logged in!', admin: { name: admin.name, email: admin.email } });
 });
 
-// Admin logout
 router.post('/logout', (req, res) => {
   res.clearCookie('admin_token', { httpOnly: true, secure: true, sameSite: 'None' });
   res.json({ message: 'Logged out!' });
@@ -158,10 +155,11 @@ router.delete('/store-items/:id', adminAuth, async (req, res) => {
 // ── Dashboard Stats ──
 
 router.get('/stats', adminAuth, async (req, res) => {
-  const [usersResult, storeResult, ordersResult] = await Promise.all([
+  const [usersResult, storeResult, ordersResult, listingsResult] = await Promise.all([
     supabase.from('profiles').select('membership_type'),
     supabase.from('store_items').select('id, is_active'),
-    supabase.from('orders').select('total, status')
+    supabase.from('orders').select('total, status'),
+    supabase.from('pomsky_listings').select('id, is_active')
   ]);
 
   const users = usersResult.data || [];
@@ -175,8 +173,90 @@ router.get('/stats', adminAuth, async (req, res) => {
     total_store_items: (storeResult.data || []).length,
     active_store_items: (storeResult.data || []).filter(i => i.is_active).length,
     total_orders: (ordersResult.data || []).length,
+    total_listings: (listingsResult.data || []).length,
+    active_listings: (listingsResult.data || []).filter(l => l.is_active).length,
     membership_counts: membershipCounts
   });
+});
+
+// ── Pomsky Listings Management ──
+
+// Get all listings
+router.get('/listings', adminAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('pomsky_listings')
+    .select(`
+      *,
+      breeder_profiles (breeder_name, business_name)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ listings: data });
+});
+
+// Approve or feature a listing
+router.patch('/listings/:id', adminAuth, async (req, res) => {
+  const { is_active, is_featured } = req.body;
+
+  const { error } = await supabase
+    .from('pomsky_listings')
+    .update({ is_active, is_featured })
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ message: 'Listing updated!' });
+});
+
+// Delete a listing
+router.delete('/listings/:id', adminAuth, async (req, res) => {
+  const { error } = await supabase
+    .from('pomsky_listings')
+    .delete()
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ message: 'Listing deleted!' });
+});
+
+// ── Breeders Management ──
+
+// Get all breeder profiles
+router.get('/breeders', adminAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('breeder_profiles')
+    .select(`
+      *,
+      profiles (full_name, email, membership_type)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ breeders: data });
+});
+
+// Approve or feature a breeder
+router.patch('/breeders/:id', adminAuth, async (req, res) => {
+  const { is_approved, is_featured } = req.body;
+
+  const { error } = await supabase
+    .from('breeder_profiles')
+    .update({ is_approved, is_featured })
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ message: 'Breeder updated!' });
+});
+
+// Delete a breeder profile
+router.delete('/breeders/:id', adminAuth, async (req, res) => {
+  const { error } = await supabase
+    .from('breeder_profiles')
+    .delete()
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ message: 'Breeder deleted!' });
 });
 
 module.exports = router;

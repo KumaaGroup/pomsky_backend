@@ -34,7 +34,6 @@ router.post('/change-password', authMiddleware, async (req, res) => {
 router.post('/billing-address', authMiddleware, async (req, res) => {
   const { first_name, last_name, address_line1, address_line2, city, state, zip_code, country } = req.body;
 
-  // Set all existing to non-default
   await supabase
     .from('billing_addresses')
     .update({ is_default: false })
@@ -101,6 +100,138 @@ router.delete('/shipping-address/:id', authMiddleware, async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message });
   res.json({ message: 'Address deleted!' });
+});
+
+// ── Breeder Profile ──
+
+// Save or update breeder profile
+router.post('/breeder-profile', authMiddleware, async (req, res) => {
+  const { breeder_name, business_name, state, city, phone, website, bio } = req.body;
+
+  if (!breeder_name) return res.status(400).json({ error: 'Breeder name is required' });
+
+  const { data: existing } = await supabase
+    .from('breeder_profiles')
+    .select('id')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+
+  let result;
+  if (existing) {
+    result = await supabase
+      .from('breeder_profiles')
+      .update({ breeder_name, business_name, state, city, phone, website, bio })
+      .eq('user_id', req.user.id)
+      .select()
+      .single();
+  } else {
+    result = await supabase
+      .from('breeder_profiles')
+      .insert({ user_id: req.user.id, breeder_name, business_name, state, city, phone, website, bio })
+      .select()
+      .single();
+  }
+
+  if (result.error) return res.status(400).json({ error: result.error.message });
+  res.json({ message: 'Breeder profile saved!', profile: result.data });
+});
+
+// Get breeder profile
+router.get('/breeder-profile', authMiddleware, async (req, res) => {
+  const { data, error } = await supabase
+    .from('breeder_profiles')
+    .select('*')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ profile: data });
+});
+
+// ── Pomsky Listings ──
+
+// Add a new listing
+router.post('/listings', authMiddleware, async (req, res) => {
+  const {
+    name, gender, pomsky_type, markings,
+    price, availability, state, city,
+    images, description, birth_date, is_new_litter
+  } = req.body;
+
+  // Get breeder profile first
+  const { data: breeder } = await supabase
+    .from('breeder_profiles')
+    .select('id')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+
+  if (!breeder) {
+    return res.status(400).json({ error: 'Please set up your breeder profile first' });
+  }
+
+  const { data, error } = await supabase
+    .from('pomsky_listings')
+    .insert({
+      breeder_id: breeder.id,
+      user_id: req.user.id,
+      name, gender, pomsky_type, markings,
+      price, availability: availability || 'available',
+      state, city,
+      images: images || [],
+      description, birth_date,
+      is_new_litter: is_new_litter || false
+    })
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ message: 'Listing added!', listing: data });
+});
+
+// Get breeder's own listings
+router.get('/my-listings', authMiddleware, async (req, res) => {
+  const { data, error } = await supabase
+    .from('pomsky_listings')
+    .select('*')
+    .eq('user_id', req.user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ listings: data });
+});
+
+// Update a listing
+router.patch('/listings/:id', authMiddleware, async (req, res) => {
+  const {
+    name, gender, pomsky_type, markings,
+    price, availability, state, city,
+    images, description, is_new_litter
+  } = req.body;
+
+  const { error } = await supabase
+    .from('pomsky_listings')
+    .update({
+      name, gender, pomsky_type, markings,
+      price, availability, state, city,
+      images, description, is_new_litter
+    })
+    .eq('id', req.params.id)
+    .eq('user_id', req.user.id); // ensure they own it
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ message: 'Listing updated!' });
+});
+
+// Delete a listing
+router.delete('/listings/:id', authMiddleware, async (req, res) => {
+  const { error } = await supabase
+    .from('pomsky_listings')
+    .delete()
+    .eq('id', req.params.id)
+    .eq('user_id', req.user.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ message: 'Listing deleted!' });
 });
 
 module.exports = router;
