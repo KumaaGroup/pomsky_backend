@@ -17,6 +17,7 @@ app.use(cors({
 }));
 
 // Body parsing middleware MUST come before routes
+app.use('/webhook', require('./routes/webhooks'));
 app.use(express.json());
 app.use(cookieParser());
 
