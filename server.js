@@ -30,6 +30,6 @@ app.use('/membership', require('./routes/membership'));
 app.use('/user', require('./routes/user'));
 app.use('/admin', require('./routes/admin'));
 app.use('/listings', require('./routes/listings'));
-// app.use('/payments', require('./routes/payments'));
+app.use('/payments', require('./routes/payments'));
 
 app.listen(3000, () => console.log('Server running on port 3000'));
