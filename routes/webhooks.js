@@ -28,24 +28,53 @@ router.post(
 
         // ── Payment successful ──
         case 'checkout.session.completed': {
-          const session = event.data.object;
-          const { user_id, membership_type } = session.metadata;
+  const session = event.data.object;
+  const { user_id, membership_type } = session.metadata;
 
-          console.log(`Upgrading user ${user_id} to ${membership_type}`);
+  // Get current membership before upgrading
+  const { data: currentProfile } = await supabase
+    .from('profiles')
+    .select('membership_type, membership_status, stripe_subscription_id')
+    .eq('id', user_id)
+    .single();
 
-          await supabase
-            .from('profiles')
-            .update({
-              membership_type,
-              membership_status: 'active',
-              stripe_customer_id: session.customer,
-              stripe_subscription_id: session.subscription || null
-            })
-            .eq('id', user_id);
+  // Save old membership to history
+  if (currentProfile?.membership_type) {
+    await supabase
+      .from('membership_history')
+      .insert({
+        user_id,
+        membership_type: currentProfile.membership_type,
+        membership_status: 'replaced',
+        ended_at: new Date().toISOString(),
+        stripe_subscription_id: currentProfile.stripe_subscription_id
+      });
+  }
 
-          console.log('Membership upgraded successfully');
-          break;
-        }
+  // Save new membership to history
+  await supabase
+    .from('membership_history')
+    .insert({
+      user_id,
+      membership_type,
+      membership_status: 'active',
+      started_at: new Date().toISOString(),
+      stripe_subscription_id: session.subscription || null
+    });
+
+  // Upgrade profile
+  await supabase
+    .from('profiles')
+    .update({
+      membership_type,
+      membership_status: 'active',
+      stripe_customer_id: session.customer,
+      stripe_subscription_id: session.subscription || null
+    })
+    .eq('id', user_id);
+
+  break;
+}
 
         // ── Subscription renewed ──
         case 'invoice.payment_succeeded': {
