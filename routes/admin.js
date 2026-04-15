@@ -58,10 +58,10 @@ router.post('/login', async (req, res) => {
     { expiresIn: '8h' }
   );
 
-  res.cookie('admin_token', token, {
+ res.cookie('admin_token', token, {
   httpOnly: true,
-  secure: false, // 🔥 IMPORTANT
-  sameSite: 'Lax'
+  secure: true,
+  sameSite: 'None'
 });
 
   res.json({ message: 'Logged in!', admin: { name: admin.name, email: admin.email } });
