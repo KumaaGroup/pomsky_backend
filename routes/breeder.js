@@ -13,7 +13,11 @@ router.post('/schedule-litter', upload.none(), async (req, res) => {
     if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: userData } = await supabase.auth.getUser(token);
-    const user = userData.user;
+    if (!userData || !userData.user) {
+  return res.status(401).json({ error: 'Invalid user' });
+}
+
+const user = userData.user;
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -21,9 +25,13 @@ router.post('/schedule-litter', upload.none(), async (req, res) => {
       .eq('id', user.id)
       .single();
 
-    if (profile.membership_type !== 'breeder_gold') {
-      return res.status(403).json({ error: 'Only Gold members allowed' });
-    }
+    if (!profile) {
+  return res.status(400).json({ error: 'Profile not found' });
+}
+
+if (profile.membership_type !== 'breeder_gold') {
+  return res.status(403).json({ error: 'Only Gold members allowed' });
+}
 
     const { name, kennel, message, url, date } = req.body;
 
@@ -55,7 +63,8 @@ router.post('/schedule-litter', upload.none(), async (req, res) => {
     res.json({ message: 'Submitted successfully' });
 
   } catch (err) {
-    console.error("🔥 ERROR:", err);
+    console.error("🔥 FULL ERROR:", err);
+console.error("🔥 STACK:", err.stack);
     res.status(500).json({ error: 'Server error' });
   }
 });
