@@ -31,6 +31,19 @@ router.post(
   const session = event.data.object;
   const { user_id, membership_type } = session.metadata;
 
+  // 🔥 ADD THIS
+  const isPaidBreeder =
+    membership_type === 'breeder_silver' ||
+    membership_type === 'breeder_gold';
+
+  const { data: existingBreeder } = await supabase
+    .from('breeder_profiles')
+    .select('id')
+    .eq('id', user_id)
+    .single();
+
+  const needsOnboarding = isPaidBreeder && !existingBreeder;
+
   // Get current membership before upgrading
   const { data: currentProfile } = await supabase
     .from('profiles')
@@ -38,7 +51,6 @@ router.post(
     .eq('id', user_id)
     .single();
 
-  // Save old membership to history
   if (currentProfile?.membership_type) {
     await supabase
       .from('membership_history')
@@ -51,7 +63,6 @@ router.post(
       });
   }
 
-  // Save new membership to history
   await supabase
     .from('membership_history')
     .insert({
@@ -62,14 +73,14 @@ router.post(
       stripe_subscription_id: session.subscription || null
     });
 
-  // Upgrade profile
   await supabase
     .from('profiles')
     .update({
       membership_type,
       membership_status: 'active',
       stripe_customer_id: session.customer,
-      stripe_subscription_id: session.subscription || null
+      stripe_subscription_id: session.subscription || null,
+      needs_onboarding: needsOnboarding // ✅ FIXED
     })
     .eq('id', user_id);
 
