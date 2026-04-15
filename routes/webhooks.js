@@ -78,6 +78,7 @@ router.post(
     .update({
       membership_type,
       membership_status: 'active',
+      account_type: isPaidBreeder ? 'breeder' : currentProfile.account_type,
       stripe_customer_id: session.customer,
       stripe_subscription_id: session.subscription || null,
       needs_onboarding: needsOnboarding // ✅ FIXED
