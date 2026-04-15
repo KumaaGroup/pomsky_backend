@@ -6,20 +6,17 @@ require('dotenv').config();
 const app = express();
 
 app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin || origin.endsWith('.webflow.com') || origin.endsWith('.webflow.io')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: [
+    "https://pomsky-association.webflow.io",
+    "https://your-custom-domain.com"
+  ],
   credentials: true
 }));
 
 // Body parsing middleware MUST come before routes
-app.use('/webhook', require('./routes/webhooks'));
-app.use(express.json());
 app.use(cookieParser());
+app.use(express.json());
+app.use('/webhook', require('./routes/webhooks'));
 
 // Stripe/webhook routes are disabled until Stripe is configured
 // app.use('/webhook', require('./routes/webhooks'));
