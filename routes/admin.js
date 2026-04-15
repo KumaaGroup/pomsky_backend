@@ -259,5 +259,46 @@ router.delete('/breeders/:id', adminAuth, async (req, res) => {
   res.json({ message: 'Breeder deleted!' });
 });
 
+// ── Litter Requests Management ──
+
+// Get all litter requests
+router.get('/litter-requests', adminAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('litter_requests')
+    .select(`
+      *,
+      profiles (full_name, email)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  res.json({ requests: data });
+});
+
+// Approve request
+router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
+  const { error } = await supabase
+    .from('litter_requests')
+    .update({ status: 'approved' })
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  res.json({ message: 'Litter approved!' });
+});
+
+// Reject request
+router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
+  const { error } = await supabase
+    .from('litter_requests')
+    .update({ status: 'rejected' })
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  res.json({ message: 'Litter rejected!' });
+});
+
 module.exports = router;
 module.exports.adminAuth = adminAuth;
