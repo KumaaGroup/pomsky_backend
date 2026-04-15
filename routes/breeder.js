@@ -7,7 +7,7 @@ const supabase = require('../supabase');
 // const multer = require('multer');
 // const upload = multer();
 
-router.post('/schedule-litter', upload.none(), async (req, res) => {
+router.post('/schedule-litter', upload.array('photos'), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Not authenticated' });
