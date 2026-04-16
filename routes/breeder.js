@@ -57,7 +57,18 @@ if (profile.membership_type !== 'breeder_gold') {
       message,
       url,
       date,
-      status: 'pending'
+      status: 'pending',
+      availability,
+      puppies_available,
+      state,
+      price_min,
+      price_max,
+      next_litter,
+      pomsky_type,
+      gender,
+      markings,
+      contact_email,
+      contact_phone,
     });
 
     res.json({ message: 'Submitted successfully' });

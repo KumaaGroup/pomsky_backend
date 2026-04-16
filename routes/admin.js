@@ -342,6 +342,7 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       });
 
     console.log("INSERT RESULT:", insertData);
+    console.error("INSERT ERROR:", insertError);
 
     if (insertError) {
       console.error("INSERT ERROR:", insertError);
