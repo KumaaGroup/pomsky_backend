@@ -265,14 +265,10 @@ router.delete('/breeders/:id', adminAuth, async (req, res) => {
 router.get('/litter-requests', adminAuth, async (req, res) => {
   const { data, error } = await supabase
     .from('litter_requests')
-    .select(`
-      *,
-      profiles (full_name, email)
-    `)
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (error) return res.status(400).json({ error: error.message });
-
   res.json({ requests: data });
 });
 
