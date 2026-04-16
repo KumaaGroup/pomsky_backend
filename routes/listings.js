@@ -157,7 +157,7 @@ console.log("CHARS:", [...req.params.id]);
       .select(`
         id, name, gender, pomsky_type, markings, price,
         availability, state, city, images,
-        puppies_available, contact_email, contact_phone,
+       contact_email, contact_phone,
         description, birth_date, is_new_litter, created_at,
         breeder_profiles (
           breeder_name, business_name, state, city, phone, website
