@@ -338,7 +338,7 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
         contact_email: request.contact_email || null,
         contact_phone: request.contact_phone || null,
 
-        // images: []
+        images: request.images || []
       });
 
     console.log("INSERT RESULT:", insertData);

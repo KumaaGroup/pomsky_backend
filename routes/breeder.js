@@ -77,33 +77,38 @@ if (files && files.length > 0) {
       });
     }
 
-    await supabase.from('litter_requests').insert({
-      user_id: user.id,
-      name,
-      kennel,
-      message,
-      url,
-      date,
-      status: 'pending',
-      availability,
-      puppies_available,
-      state,
-      price_min,
-      price_max,
-      next_litter,
-      pomsky_type,
-      gender,
-      markings,
-      contact_email,
-      contact_phone,
-      images: imageUrls,
-    });
-    if (insertError) {
+    const { error: insertError } = await supabase
+  .from('litter_requests')
+  .insert({
+    user_id: user.id,
+    name,
+    kennel,
+    message,
+    url,
+    date,
+    status: 'pending',
+    availability,
+    puppies_available,
+    state,
+    price_min,
+    price_max,
+    next_litter,
+    pomsky_type,
+    gender,
+    markings,
+    contact_email,
+    contact_phone,
+    images: imageUrls,
+  });
+
+if (insertError) {
   console.error("❌ INSERT ERROR:", insertError);
   return res.status(400).json({ error: insertError.message });
-    }
+}
 
     res.json({ message: 'Submitted successfully' });
+    console.log("FILES:", req.files);
+console.log("UPLOAD URLS:", imageUrls);
 
   } catch (err) {
     console.error("🔥 FULL ERROR:", err);
