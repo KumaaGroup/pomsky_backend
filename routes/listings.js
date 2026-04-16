@@ -91,19 +91,58 @@ router.get('/:id', async (req, res) => {
         .eq('id', userData.user.id)
         .maybeSingle();
 
-      const paidTypes = ['shopper_monthly', 'shopper_lifetime', 'owner_monthly', 'owner_annual', 'breeder_free', 'breeder_silver', 'breeder_gold'];
+      const paidTypes = [
+        'shopper_monthly',
+        'shopper_lifetime',
+        'owner_monthly',
+        'owner_annual',
+        'breeder_free',
+        'breeder_silver',
+        'breeder_gold'
+      ];
+
       isPaidMember = paidTypes.includes(profile?.membership_type);
     }
   }
 
   const { data, error } = await supabase
     .from('pomsky_listings')
-    .select(`*, breeder_profiles(*)`)
+    .select(`
+      id,
+      name,
+      gender,
+      pomsky_type,
+      markings,
+      price,
+      availability,
+      state,
+      images,
+      puppies_available,
+      contact_email,
+      contact_phone,
+      created_at,
+      breeder_profiles (
+        breeder_name,
+        business_name
+      )
+    `)
     .eq('id', req.params.id)
+    .eq('is_active', true)
     .single();
 
   if (error) return res.status(404).json({ error: 'Listing not found' });
-  if (!isPaidMember) return res.status(403).json({ error: 'Paid membership required' });
+
+  if (!isPaidMember) {
+    return res.json({
+      listing: {
+        ...data,
+        contact_email: null,
+        contact_phone: null,
+        images: []
+      },
+      locked: true
+    });
+  }
 
   res.json({ listing: data });
 });

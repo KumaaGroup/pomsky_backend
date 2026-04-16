@@ -298,34 +298,22 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
 
     // 3. CREATE LISTING 🔥🔥🔥
     const { error: insertError } = await supabase
-      .from('pomsky_listings')
-      .insert({
-        name: request.kennel,
-        gender: request.gender,
-        pomsky_type: request.pomsky_type,
-        markings: request.markings,
-
-        // pricing
-        price: request.price_min ? Number(request.price_min) : null,
-
-        availability: request.availability,
-        state: request.state,
-
-        // flags
-        is_new_litter: true,
-        is_active: true,
-        is_featured: false,
-
-        // contact
-        contact_email: request.contact_email,
-        contact_phone: request.contact_phone,
-
-        // relation
-        breeder_id: request.user_id,
-
-        // optional
-        images: []
-      });
+  .from('pomsky_listings')
+  .insert({
+    name: request.kennel,
+    gender: request.gender,
+    pomsky_type: request.pomsky_type,
+    markings: request.markings,
+    price: request.price_min,
+    availability: request.availability,
+    state: request.state,
+    breeder_id: request.user_id,
+    is_active: true,
+    is_new_litter: true,
+    images: [],
+    contact_email: request.contact_email,
+    contact_phone: request.contact_phone
+  });
 
     if (insertError) {
       console.error(insertError);
