@@ -289,7 +289,25 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    // 2. Update status
+    // 🔥 2. GET BREEDER PROFILE (THIS WAS MISSING)
+    const { data: breeder, error: breederError } = await supabase
+      .from('breeder_profiles')
+      .select('id')
+      .eq('user_id', request.user_id)
+      .maybeSingle();
+
+    if (breederError) {
+      console.error("BREEDER FETCH ERROR:", breederError);
+      return res.status(400).json({ error: breederError.message });
+    }
+
+    if (!breeder) {
+      return res.status(400).json({ error: 'Breeder profile not found' });
+    }
+
+    console.log("BREEDER FOUND:", breeder);
+
+    // 3. Update request status
     const { error: updateError } = await supabase
       .from('litter_requests')
       .update({ status: 'approved' })
@@ -300,25 +318,25 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       return res.status(400).json({ error: updateError.message });
     }
 
-    // 3. INSERT LISTING 🔥
+    // 🔥 4. INSERT LISTING (NOW WORKS)
     const { data: insertData, error: insertError } = await supabase
       .from('pomsky_listings')
       .insert({
-        name: request.kennel,
-        gender: request.gender,
-        pomsky_type: request.pomsky_type,
-        markings: request.markings,
-        price: request.price_min,
-        availability: request.availability,
-        state: request.state,
+        name: request.kennel || "Pomsky",
+        gender: request.gender || null,
+        pomsky_type: request.pomsky_type || null,
+        markings: request.markings || null,
+        price: request.price_min || null,
+        availability: request.availability || "available",
+        state: request.state || null,
 
-        breeder_id: breeder.id,
+        breeder_id: breeder.id, // ✅ FIXED
 
         is_active: true,
         is_new_litter: true,
 
-        contact_email: request.contact_email,
-        contact_phone: request.contact_phone,
+        contact_email: request.contact_email || null,
+        contact_phone: request.contact_phone || null,
 
         images: []
       });
