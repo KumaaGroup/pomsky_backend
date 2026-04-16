@@ -33,7 +33,7 @@ if (profile.membership_type !== 'breeder_gold') {
   return res.status(403).json({ error: 'Only Gold members allowed' });
 }
 
-    const { name, kennel, message, url, date } = req.body;
+    const { name, kennel, message, url, date, availability, puppies_available, state, price_min, price_max, next_litter, pomsky_type, gender, markings, contact_email, contact_phone,} = req.body;
 
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
