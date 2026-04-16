@@ -39,7 +39,7 @@ router.post(
   const { data: existingBreeder } = await supabase
     .from('breeder_profiles')
     .select('id')
-    .eq('id', user_id)
+    .eq('user_id', user_id)
     .single();
 
   const needsOnboarding = isPaidBreeder && !existingBreeder;
@@ -83,7 +83,39 @@ router.post(
       stripe_subscription_id: session.subscription || null,
       needs_onboarding: needsOnboarding // ✅ FIXED
     })
-    .eq('id', user_id);
+    .eq('user_id', user_id)
+
+
+    // 🔥 HANDLE BREEDER PROFILE
+if (isPaidBreeder) {
+  const { data: breeder } = await supabase
+    .from('breeder_profiles')
+    .select('id')
+    .eq('user_id', user_id)
+    .single();
+
+  if (breeder) {
+    // 👉 Update existing breeder
+    await supabase
+      .from('breeder_profiles')
+      .update({
+        is_featured: membership_type === 'breeder_gold'
+      })
+      .eq('user_id', user_id);
+
+  } else {
+    // 👉 Create breeder profile if missing
+    await supabase
+      .from('breeder_profiles')
+      .insert({
+        user_id: user_id,
+        breeder_name: 'New Breeder',
+        business_name: 'Pending Setup',
+        is_featured: membership_type === 'breeder_gold',
+        is_approved: false
+      });
+  }
+}
 
   break;
 }

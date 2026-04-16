@@ -312,7 +312,7 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
         availability: request.availability,
         state: request.state,
 
-        breeder_id: request.user_id,
+        breeder_id: breeder.id,,
 
         is_active: true,
         is_new_litter: true,
