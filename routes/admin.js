@@ -282,57 +282,47 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       .eq('id', req.params.id)
       .single();
 
-    console.log("REQUEST DATA:", request);
-
     if (fetchError || !request) {
       console.error("FETCH ERROR:", fetchError);
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    // 🔥 2. GET BREEDER PROFILE (THIS WAS MISSING)
-    // In the approve route, replace the breeder check with:
-let breeder = null;
-const { data: existingBreeder } = await supabase
-  .from('breeder_profiles')
-  .select('id')
-  .eq('user_id', request.user_id)
-  .maybeSingle();
+    // 2. Get or auto-create breeder profile
+    let breeder = null;
 
-if (existingBreeder) {
-  breeder = existingBreeder;
-} else {
-  // Auto-create a breeder profile so approval doesn't fail
-  const { data: newBreeder, error: createError } = await supabase
-    .from('breeder_profiles')
-    .insert({
-      user_id: request.user_id,
-      breeder_name: request.name || 'New Breeder',
-      business_name: request.kennel || 'Pending Setup',
-      state: request.state || null,
-      is_approved: true,
-      is_featured: false
-    })
-    .select('id')
-    .single();
+    const { data: existingBreeder } = await supabase
+      .from('breeder_profiles')
+      .select('id')
+      .eq('user_id', request.user_id)
+      .maybeSingle();
 
-  if (createError) {
-    return res.status(400).json({ error: 'Could not create breeder profile: ' + createError.message });
-  }
-  breeder = newBreeder;
-}
+    if (existingBreeder) {
+      breeder = existingBreeder;
+    } else {
+      const { data: newBreeder, error: createError } = await supabase
+        .from('breeder_profiles')
+        .insert({
+          user_id: request.user_id,
+          breeder_name: request.name || 'New Breeder',
+          business_name: request.kennel || 'Pending Setup',
+          state: request.state || null,
+          is_approved: true,
+          is_featured: false
+        })
+        .select('id')
+        .single();
 
-    if (breederError) {
-      console.error("BREEDER FETCH ERROR:", breederError);
-      return res.status(400).json({ error: breederError.message });
+      if (createError) {
+        console.error("CREATE BREEDER ERROR:", createError);
+        return res.status(400).json({ error: 'Could not create breeder profile: ' + createError.message });
+      }
+
+      breeder = newBreeder;
     }
 
-    if (!breeder) {
-      return res.status(400).json({ error: 'Breeder profile not found' });
-    }
+    console.log("BREEDER:", breeder);
 
-    console.log("BREEDER FOUND:", breeder);
-
-    // 3. Update request status
+    // 3. Update request status to approved
     const { error: updateError } = await supabase
       .from('litter_requests')
       .update({ status: 'approved' })
@@ -343,37 +333,31 @@ if (existingBreeder) {
       return res.status(400).json({ error: updateError.message });
     }
 
-    // 🔥 4. INSERT LISTING (NOW WORKS)
+    // 4. Insert listing
     const { data: insertData, error: insertError } = await supabase
       .from('pomsky_listings')
       .insert({
-        name: request.kennel || "Pomsky",
+        name: request.kennel || 'Pomsky',
         gender: request.gender || null,
         pomsky_type: request.pomsky_type || null,
         markings: request.markings || null,
         price: request.price_min || null,
-        availability: request.availability || "available",
+        availability: request.availability || 'available',
         state: request.state || null,
-
-        breeder_id: breeder.id, // ✅ FIXED
-
+        breeder_id: breeder.id,
         is_active: true,
         is_new_litter: true,
-
         contact_email: request.contact_email || null,
         contact_phone: request.contact_phone || null,
-
         images: request.images || []
       });
-
-    console.log("INSERT RESULT:", insertData);
-    console.error("INSERT ERROR:", insertError);
 
     if (insertError) {
       console.error("INSERT ERROR:", insertError);
       return res.status(400).json({ error: insertError.message });
     }
 
+    console.log("INSERT RESULT:", insertData);
     res.json({ message: 'Approved + listing created' });
 
   } catch (err) {
