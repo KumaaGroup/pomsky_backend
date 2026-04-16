@@ -126,6 +126,9 @@ router.get('/:id', async (req, res) => {
     const id = req.params.id.trim(); // 🔥 important fix
 
     console.log("FETCHING LISTING ID:", id);
+    console.log("RAW PARAM:", req.params.id);
+console.log("LENGTH:", req.params.id.length);
+console.log("CHARS:", [...req.params.id]);
 
     const token = req.cookies.token;
     let isPaidMember = false;
