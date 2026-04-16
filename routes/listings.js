@@ -3,9 +3,24 @@ const router = express.Router();
 const supabase = require('../supabase');
 const authMiddleware = require('../middleware/auth');
 
+// GET all US states for filter
+// ⚠️ This MUST be before /:id route
+router.get('/meta/states', async (req, res) => {
+  const { data, error } = await supabase
+    .from('pomsky_listings')
+    .select('state')
+    .eq('is_active', true)
+    .not('state', 'is', null);
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  const states = [...new Set(data.map(d => d.state))].filter(Boolean).sort();
+  res.json({ states });
+});
+
 // GET listings — free users see limited, paid see all
 router.get('/', async (req, res) => {
-  const { state, gender, type, availability, min_price, max_price, new_litter, limit = 50 } = req.query;
+  const { state, gender, type, availability, min_price, max_price, new_litter } = req.query;
 
   let query = supabase
     .from('pomsky_listings')
@@ -22,7 +37,6 @@ router.get('/', async (req, res) => {
     .order('is_featured', { ascending: false })
     .order('created_at', { ascending: false });
 
-  // Apply filters
   if (state) query = query.eq('state', state);
   if (gender) query = query.eq('gender', gender);
   if (type) query = query.eq('pomsky_type', type);
@@ -34,7 +48,6 @@ router.get('/', async (req, res) => {
   const { data, error } = await query;
   if (error) return res.status(400).json({ error: error.message });
 
-  // Check if user is logged in and has paid membership
   let isPaidMember = false;
   const token = req.cookies.token;
 
@@ -52,7 +65,6 @@ router.get('/', async (req, res) => {
     }
   }
 
-  // Free users see only first 6 listings with blurred images
   const FREE_LIMIT = 6;
   let listings = data || [];
 
@@ -77,7 +89,7 @@ router.get('/', async (req, res) => {
   });
 });
 
-// GET single listing
+// GET single listing — /:id MUST be last
 router.get('/:id', async (req, res) => {
   const token = req.cookies.token;
   let isPaidMember = false;
@@ -92,15 +104,10 @@ router.get('/:id', async (req, res) => {
         .maybeSingle();
 
       const paidTypes = [
-        'shopper_monthly',
-        'shopper_lifetime',
-        'owner_monthly',
-        'owner_annual',
-        'breeder_free',
-        'breeder_silver',
-        'breeder_gold'
+        'shopper_monthly', 'shopper_lifetime',
+        'owner_monthly', 'owner_annual',
+        'breeder_free', 'breeder_silver', 'breeder_gold'
       ];
-
       isPaidMember = paidTypes.includes(profile?.membership_type);
     }
   }
@@ -108,57 +115,33 @@ router.get('/:id', async (req, res) => {
   const { data, error } = await supabase
     .from('pomsky_listings')
     .select(`
-      id,
-      name,
-      gender,
-      pomsky_type,
-      markings,
-      price,
-      availability,
-      state,
-      images,
-      puppies_available,
-      contact_email,
-      contact_phone,
-      created_at,
+      id, name, gender, pomsky_type, markings, price,
+      availability, state, city, images,
+      puppies_available, contact_email, contact_phone,
+      description, birth_date, is_new_litter, created_at,
       breeder_profiles (
-        breeder_name,
-        business_name
+        breeder_name, business_name, state, city, phone, website
       )
     `)
     .eq('id', req.params.id)
     .eq('is_active', true)
     .single();
 
-  if (error) return res.status(404).json({ error: 'Listing not found' });
+  if (error || !data) return res.status(404).json({ error: 'Listing not found' });
 
   if (!isPaidMember) {
     return res.json({
       listing: {
         ...data,
+        images: [],
         contact_email: null,
-        contact_phone: null,
-        images: []
+        contact_phone: null
       },
       locked: true
     });
   }
 
   res.json({ listing: data });
-});
-
-// GET all US states for filter
-router.get('/meta/states', async (req, res) => {
-  const { data, error } = await supabase
-    .from('pomsky_listings')
-    .select('state')
-    .eq('is_active', true)
-    .not('state', 'is', null);
-
-  if (error) return res.status(400).json({ error: error.message });
-
-  const states = [...new Set(data.map(d => d.state))].filter(Boolean).sort();
-  res.json({ states });
 });
 
 module.exports = router;
