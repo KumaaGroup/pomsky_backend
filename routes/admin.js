@@ -275,55 +275,65 @@ router.get('/litter-requests', adminAuth, async (req, res) => {
 // Approve request
 router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
   try {
-    // 1. Get request data
+    // 1. Fetch request
     const { data: request, error: fetchError } = await supabase
       .from('litter_requests')
       .select('*')
       .eq('id', req.params.id)
       .single();
 
+    console.log("REQUEST DATA:", request);
+
     if (fetchError || !request) {
+      console.error("FETCH ERROR:", fetchError);
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    // 2. Mark as approved
+    // 2. Update status
     const { error: updateError } = await supabase
       .from('litter_requests')
       .update({ status: 'approved' })
       .eq('id', req.params.id);
 
     if (updateError) {
+      console.error("UPDATE ERROR:", updateError);
       return res.status(400).json({ error: updateError.message });
     }
 
-    // 3. CREATE LISTING 🔥🔥🔥
-    const { error: insertError } = await supabase
-  .from('pomsky_listings')
-  .insert({
-    name: request.kennel,
-    gender: request.gender,
-    pomsky_type: request.pomsky_type,
-    markings: request.markings,
-    price: request.price_min,
-    availability: request.availability,
-    state: request.state,
-    breeder_id: request.user_id,
-    is_active: true,
-    is_new_litter: true,
-    images: [],
-    contact_email: request.contact_email,
-    contact_phone: request.contact_phone
-  });
+    // 3. INSERT LISTING 🔥
+    const { data: insertData, error: insertError } = await supabase
+      .from('pomsky_listings')
+      .insert({
+        name: request.kennel,
+        gender: request.gender,
+        pomsky_type: request.pomsky_type,
+        markings: request.markings,
+        price: request.price_min,
+        availability: request.availability,
+        state: request.state,
+
+        breeder_id: request.user_id,
+
+        is_active: true,
+        is_new_litter: true,
+
+        contact_email: request.contact_email,
+        contact_phone: request.contact_phone,
+
+        images: []
+      });
+
+    console.log("INSERT RESULT:", insertData);
 
     if (insertError) {
-      console.error(insertError);
+      console.error("INSERT ERROR:", insertError);
       return res.status(400).json({ error: insertError.message });
     }
 
-    res.json({ message: 'Litter approved & listing created!' });
+    res.json({ message: 'Approved + listing created' });
 
   } catch (err) {
-    console.error(err);
+    console.error("FULL ERROR:", err);
     res.status(500).json({ error: 'Server error' });
   }
 });
