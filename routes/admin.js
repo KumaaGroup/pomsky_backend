@@ -274,14 +274,70 @@ router.get('/litter-requests', adminAuth, async (req, res) => {
 
 // Approve request
 router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
-  const { error } = await supabase
-    .from('litter_requests')
-    .update({ status: 'approved' })
-    .eq('id', req.params.id);
+  try {
+    // 1. Get request data
+    const { data: request, error: fetchError } = await supabase
+      .from('litter_requests')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
 
-  if (error) return res.status(400).json({ error: error.message });
+    if (fetchError || !request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
 
-  res.json({ message: 'Litter approved!' });
+    // 2. Mark as approved
+    const { error: updateError } = await supabase
+      .from('litter_requests')
+      .update({ status: 'approved' })
+      .eq('id', req.params.id);
+
+    if (updateError) {
+      return res.status(400).json({ error: updateError.message });
+    }
+
+    // 3. CREATE LISTING 🔥🔥🔥
+    const { error: insertError } = await supabase
+      .from('pomsky_listings')
+      .insert({
+        name: request.kennel,
+        gender: request.gender,
+        pomsky_type: request.pomsky_type,
+        markings: request.markings,
+
+        // pricing
+        price: request.price_min ? Number(request.price_min) : null,
+
+        availability: request.availability,
+        state: request.state,
+
+        // flags
+        is_new_litter: true,
+        is_active: true,
+        is_featured: false,
+
+        // contact
+        contact_email: request.contact_email,
+        contact_phone: request.contact_phone,
+
+        // relation
+        breeder_id: request.user_id,
+
+        // optional
+        images: []
+      });
+
+    if (insertError) {
+      console.error(insertError);
+      return res.status(400).json({ error: insertError.message });
+    }
+
+    res.json({ message: 'Litter approved & listing created!' });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Reject request
