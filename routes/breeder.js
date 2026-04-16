@@ -33,6 +33,33 @@ if (profile.membership_type !== 'breeder_gold') {
   return res.status(403).json({ error: 'Only Gold members allowed' });
 }
 
+const files = req.files;
+
+let imageUrls = [];
+
+if (files && files.length > 0) {
+  for (let file of files) {
+    const fileName = `${Date.now()}-${Math.random()}-${file.originalname}`;
+
+    const { data, error } = await supabase.storage
+      .from('pomsky-images') // 👈 create this bucket
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype
+      });
+
+    if (error) {
+  console.error("❌ IMAGE UPLOAD ERROR:", error);
+} else {
+  const { data: publicUrl } = supabase
+    .storage
+    .from('pomsky-images')
+    .getPublicUrl(fileName);
+
+  imageUrls.push(publicUrl.publicUrl);
+}
+  }
+}
+
     const { name, kennel, message, url, date, availability, puppies_available, state, price_min, price_max, next_litter, pomsky_type, gender, markings, contact_email, contact_phone,} = req.body;
 
     const startOfMonth = new Date();
@@ -69,7 +96,12 @@ if (profile.membership_type !== 'breeder_gold') {
       markings,
       contact_email,
       contact_phone,
+      images: imageUrls,
     });
+    if (insertError) {
+  console.error("❌ INSERT ERROR:", insertError);
+  return res.status(400).json({ error: insertError.message });
+    }
 
     res.json({ message: 'Submitted successfully' });
 
