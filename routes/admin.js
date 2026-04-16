@@ -290,11 +290,36 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
     }
 
     // 🔥 2. GET BREEDER PROFILE (THIS WAS MISSING)
-    const { data: breeder, error: breederError } = await supabase
-      .from('breeder_profiles')
-      .select('id')
-      .eq('user_id', request.user_id)
-      .maybeSingle();
+    // In the approve route, replace the breeder check with:
+let breeder = null;
+const { data: existingBreeder } = await supabase
+  .from('breeder_profiles')
+  .select('id')
+  .eq('user_id', request.user_id)
+  .maybeSingle();
+
+if (existingBreeder) {
+  breeder = existingBreeder;
+} else {
+  // Auto-create a breeder profile so approval doesn't fail
+  const { data: newBreeder, error: createError } = await supabase
+    .from('breeder_profiles')
+    .insert({
+      user_id: request.user_id,
+      breeder_name: request.name || 'New Breeder',
+      business_name: request.kennel || 'Pending Setup',
+      state: request.state || null,
+      is_approved: true,
+      is_featured: false
+    })
+    .select('id')
+    .single();
+
+  if (createError) {
+    return res.status(400).json({ error: 'Could not create breeder profile: ' + createError.message });
+  }
+  breeder = newBreeder;
+}
 
     if (breederError) {
       console.error("BREEDER FETCH ERROR:", breederError);

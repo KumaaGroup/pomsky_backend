@@ -83,7 +83,7 @@ router.post(
       stripe_subscription_id: session.subscription || null,
       needs_onboarding: needsOnboarding // ✅ FIXED
     })
-    .eq('user_id', user_id)
+    .eq('id', user_id)
 
 
     // 🔥 HANDLE BREEDER PROFILE

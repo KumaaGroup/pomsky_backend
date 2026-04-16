@@ -111,8 +111,8 @@ if (insertError) {
 console.log("UPLOAD URLS:", imageUrls);
 
   } catch (err) {
-    console.error("🔥 FULL ERROR:", err);
-console.error("🔥 STACK:", err.stack);
+    console.error("FULL ERROR:", err);
+console.error("STACK:", err.stack);
     res.status(500).json({ error: 'Server error' });
   }
 });
