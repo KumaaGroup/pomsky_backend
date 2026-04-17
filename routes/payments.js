@@ -25,13 +25,17 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
   }
 
   const isOneTime = ONE_TIME_PLANS.includes(membership_type);
+  const isBreeder = membership_type === 'breeder_silver' || membership_type === 'breeder_gold';
 
   try {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: isOneTime ? 'payment' : 'subscription',
       line_items: [{ price: PRICE_IDS[membership_type], quantity: 1 }],
-      success_url: 'https://pomsky-association.webflow.io/dashboard?payment=success',
+      // ✅ Breeders go to onboarding, others go to dashboard
+      success_url: isBreeder
+        ? 'https://pomsky-association.webflow.io/breeder-onboarding?payment=success'
+        : 'https://pomsky-association.webflow.io/dashboard?payment=success',
       cancel_url: 'https://pomsky-association.webflow.io/memberships?payment=cancelled',
       customer_email: req.user.email,
       metadata: {

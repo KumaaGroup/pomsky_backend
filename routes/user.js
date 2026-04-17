@@ -234,4 +234,81 @@ router.delete('/listings/:id', authMiddleware, async (req, res) => {
   res.json({ message: 'Listing deleted!' });
 });
 
+// Complete breeder onboarding
+router.post('/complete-onboarding', authMiddleware, async (req, res) => {
+  const {
+    breeder_name, business_name,
+    state, city, phone, website, bio
+  } = req.body;
+
+  if (!breeder_name) {
+    return res.status(400).json({ error: 'Breeder name is required' });
+  }
+
+  // Check if breeder profile exists
+  const { data: existing } = await supabase
+    .from('breeder_profiles')
+    .select('id')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+
+  let result;
+  if (existing) {
+    result = await supabase
+      .from('breeder_profiles')
+      .update({
+        breeder_name, business_name,
+        state, city, phone, website, bio,
+        is_onboarded: true
+      })
+      .eq('user_id', req.user.id)
+      .select()
+      .single();
+  } else {
+    result = await supabase
+      .from('breeder_profiles')
+      .insert({
+        user_id: req.user.id,
+        breeder_name, business_name,
+        state, city, phone, website, bio,
+        is_onboarded: true,
+        is_approved: false
+      })
+      .select()
+      .single();
+  }
+
+  if (result.error) {
+    return res.status(400).json({ error: result.error.message });
+  }
+
+  res.json({ message: 'Onboarding complete!', profile: result.data });
+});
+
+// Check onboarding status
+router.get('/onboarding-status', authMiddleware, async (req, res) => {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('membership_type, account_type')
+    .eq('id', req.user.id)
+    .maybeSingle();
+
+  const { data: breeder } = await supabase
+    .from('breeder_profiles')
+    .select('is_onboarded, breeder_name, business_name')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+
+  const isBreeder = profile?.membership_type === 'breeder_silver' ||
+                    profile?.membership_type === 'breeder_gold' ||
+                    profile?.membership_type === 'breeder_free';
+
+  res.json({
+    is_breeder: isBreeder,
+    is_onboarded: breeder?.is_onboarded || false,
+    membership_type: profile?.membership_type,
+    breeder_name: breeder?.breeder_name || null
+  });
+});
+
 module.exports = router;

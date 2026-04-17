@@ -6,6 +6,53 @@ const supabase = require('../supabase');
 
 // const multer = require('multer');
 // const upload = multer();
+// 🔹 GET ALL BREEDERS (FEATURE PAGE)
+router.get('/', async (req, res) => {
+  try {
+    const { state } = req.query;
+
+    let query = supabase
+      .from('breeder_profiles')
+      .select(`
+        id,
+        breeder_name,
+        business_name,
+        state,
+        city,
+        profile_image,
+        website,
+        email,
+        phone,
+        is_featured,
+        is_approved
+      `)
+      .eq('is_approved', true)
+      .order('is_featured', { ascending: false });
+
+    if (state) {
+      query = query.eq('state', state);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("BREEDER FETCH ERROR:", error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    const featured = data.filter(b => b.is_featured);
+    const normal = data.filter(b => !b.is_featured);
+
+    res.json({
+      featured,
+      normal
+    });
+
+  } catch (err) {
+    console.error("BREEDER ROUTE ERROR:", err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 router.post('/schedule-litter', upload.array('photos'), async (req, res) => {
   try {

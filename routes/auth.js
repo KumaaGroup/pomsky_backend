@@ -62,19 +62,42 @@ router.post('/logout', async (req, res) => {
 
 // GET CURRENT USER + PROFILE
 router.get('/me', async (req, res) => {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const token = req.cookies.token;
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error) return res.status(401).json({ error: 'Invalid token' });
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user) return res.status(401).json({ error: 'Invalid token' });
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', data.user.id)
-    .single();
+    const userId = data.user.id;
 
-  res.json({ user: data.user, profile });
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('membership_type, account_type')
+      .eq('id', userId)
+      .maybeSingle();
+
+    // ✅ Fixed: query by user_id not id
+    const { data: breeder } = await supabase
+      .from('breeder_profiles')
+      .select('is_onboarded')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const isBreeder = ['breeder_free', 'breeder_silver', 'breeder_gold']
+      .includes(profile?.membership_type);
+
+    res.json({
+      user: data.user,
+      membership_type: profile?.membership_type || null,
+      account_type: profile?.account_type || null,
+      is_breeder: isBreeder,
+      is_onboarded: breeder?.is_onboarded || false
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

@@ -40,14 +40,15 @@ router.get('/', async (req, res) => {
     let query = supabase
       .from('pomsky_listings')
       .select(`
-        id, name, gender, pomsky_type, markings, price,
-        availability, is_new_litter, state, city, country,
-        images, is_featured, created_at,
-        breeder_profiles (
-          id, breeder_name, business_name, state, city,
-          profile_image, is_featured, is_approved
-        )
-      `)
+  id, breeder_id, name, gender, pomsky_type, markings, price,
+  availability, state, city, country,
+  images, description,
+  contact_email, contact_phone,
+  is_featured, created_at,
+  breeder_profiles (
+    id, breeder_name, business_name, state, city
+  )
+`)
       .eq('is_active', true)
       .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false });
@@ -121,75 +122,73 @@ router.get('/', async (req, res) => {
 /* ================================
    🔹 GET SINGLE LISTING (LAST!)
 ================================ */
-router.get('/:id', async (req, res) => {
+// 🔹 UPDATE LISTING
+router.put('/:id', async (req, res) => {
   try {
-    const id = req.params.id.trim(); // 🔥 important fix
-
-    console.log("FETCHING LISTING ID:", id);
-    console.log("RAW PARAM:", req.params.id);
-console.log("LENGTH:", req.params.id.length);
-console.log("CHARS:", [...req.params.id]);
-
+    const id = req.params.id.trim();
     const token = req.cookies.token;
-    let isPaidMember = false;
 
-    if (token) {
-      const { data: userData } = await supabase.auth.getUser(token);
-      if (userData?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('membership_type')
-          .eq('id', userData.user.id)
-          .maybeSingle();
-
-        const paidTypes = [
-          'shopper_monthly', 'shopper_lifetime',
-          'owner_monthly', 'owner_annual',
-          'breeder_free', 'breeder_silver', 'breeder_gold'
-        ];
-
-        isPaidMember = paidTypes.includes(profile?.membership_type);
-      }
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
+
+    // 🔹 Get logged-in user
+    const { data: userData } = await supabase.auth.getUser(token);
+    if (!userData?.user) {
+      return res.status(401).json({ error: "Invalid user" });
+    }
+
+    const userId = userData.user.id;
+
+    // 🔹 Fetch listing
+    const { data: listing } = await supabase
+      .from('pomsky_listings')
+      .select('id, breeder_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    // 🔥 CRITICAL CHECK
+    if (listing.breeder_id !== userId) {
+      return res.status(403).json({ error: "You don't own this listing" });
+    }
+
+    // 🔹 Allowed fields
+    const {
+      name, price, state, city,
+      description, images,
+      gender, pomsky_type, markings,
+      contact_email, contact_phone
+    } = req.body;
 
     const { data, error } = await supabase
       .from('pomsky_listings')
-      .select(`
-        id, name, gender, pomsky_type, markings, price,
-        availability, state, city, images,
-       contact_email, contact_phone,
-        description, birth_date, is_new_litter, created_at,
-        breeder_profiles (
-          breeder_name, business_name, state, city, phone, website
-        )
-      `)
-      .eq('id', id)
-      .eq('is_active', true)
-      .maybeSingle(); // 🔥 safer than single()
+      .update({
+        name,
+        price,
+        state,
+        city,
+        description,
+        images,
+        gender,
+        pomsky_type,
+        markings,
+        contact_email,
+        contact_phone
+      })
+      .eq('id', id);
 
-    console.log("DB RESULT:", data);
-    console.log("DB ERROR:", error);
-
-    if (!data) {
-      return res.status(404).json({ error: 'Listing not found' });
+    if (error) {
+      return res.status(400).json({ error: error.message });
     }
 
-    if (!isPaidMember) {
-      return res.json({
-        listing: {
-          ...data,
-          images: [],
-          contact_email: null,
-          contact_phone: null
-        },
-        locked: true
-      });
-    }
-
-    res.json({ listing: data });
+    res.json({ success: true, data });
 
   } catch (err) {
-    console.error("SINGLE LISTING ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
