@@ -64,34 +64,35 @@ router.post('/logout', async (req, res) => {
 router.get('/me', async (req, res) => {
   try {
     const token = req.cookies.token;
-    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+    if (!token) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
 
+    // 🔹 Get user
     const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data.user) return res.status(401).json({ error: 'Invalid token' });
+    if (error || !data.user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
 
     const userId = data.user.id;
 
+    // 🔹 Get profile (membership)
     const { data: profile } = await supabase
       .from('profiles')
-      .select('membership_type, account_type')
+      .select('membership_type')
       .eq('id', userId)
       .maybeSingle();
 
-    // ✅ Fixed: query by user_id not id
+    // 🔹 Get breeder onboarding status
     const { data: breeder } = await supabase
       .from('breeder_profiles')
       .select('is_onboarded')
-      .eq('user_id', userId)
+      .eq('id', userId)
       .maybeSingle();
-
-    const isBreeder = ['breeder_free', 'breeder_silver', 'breeder_gold']
-      .includes(profile?.membership_type);
 
     res.json({
       user: data.user,
       membership_type: profile?.membership_type || null,
-      account_type: profile?.account_type || null,
-      is_breeder: isBreeder,
       is_onboarded: breeder?.is_onboarded || false
     });
 
