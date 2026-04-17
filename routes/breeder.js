@@ -115,21 +115,6 @@ if (files && files.length > 0) {
 
     const { name, kennel, message, url, date, availability, puppies_available, state, price_min, price_max, next_litter, pomsky_type, gender, markings, contact_email, contact_phone,} = req.body;
 
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-
-    const { data: existing } = await supabase
-      .from('litter_requests')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('created_at', startOfMonth.toISOString());
-
-    if ((existing || []).length >= 1) {
-      return res.status(400).json({
-        error: 'You can only submit one litter per month'
-      });
-    }
-
     const { error: insertError } = await supabase
   .from('litter_requests')
   .insert({
