@@ -378,6 +378,17 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
   res.json({ message: 'Litter rejected!' });
 });
 
+router.get('/breeder-requests', adminAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('breeder_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  res.json({ requests: data });
+});
+
 // router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
 //   try {
 //     // 1. Get request

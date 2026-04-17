@@ -267,17 +267,6 @@ router.post('/complete-onboarding', authMiddleware, async (req, res) => {
   res.json({ message: 'Request submitted for approval' });
 });
 
-router.get('/breeder-requests', adminAuth, async (req, res) => {
-  const { data, error } = await supabase
-    .from('breeder_requests')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) return res.status(400).json({ error: error.message });
-
-  res.json({ requests: data });
-});
-
 // Check onboarding status
 router.get('/onboarding-status', authMiddleware, async (req, res) => {
   const { data: profile } = await supabase
