@@ -14,8 +14,8 @@ app.use(cors({
 
 // Body parsing middleware MUST come before routes
 app.use(cookieParser());
-app.use(express.json());
 app.use('/webhook', require('./routes/webhooks'));
+app.use(express.json());
 
 // Stripe/webhook routes are disabled until Stripe is configured
 // app.use('/webhook', require('./routes/webhooks'));
