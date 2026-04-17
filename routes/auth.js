@@ -63,31 +63,36 @@ router.post('/logout', async (req, res) => {
 // GET CURRENT USER + PROFILE
 router.get('/me', async (req, res) => {
   try {
+    console.log("COOKIE:", req.cookies);
+
     const token = req.cookies.token;
+
     if (!token) {
+      console.log("NO TOKEN");
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    // 🔹 Get user
     const { data, error } = await supabase.auth.getUser(token);
+
+    console.log("USER DATA:", data);
+    console.log("ERROR:", error);
+
     if (error || !data.user) {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    const user_id = data.user.id;
+    const userId = data.user.id;
 
-    // 🔹 Get profile (membership)
     const { data: profile } = await supabase
       .from('profiles')
       .select('membership_type')
       .eq('id', userId)
       .maybeSingle();
 
-    // 🔹 Get breeder onboarding status
     const { data: breeder } = await supabase
       .from('breeder_profiles')
       .select('is_onboarded')
-      .eq('userid', userId)
+      .eq('user_id', userId)
       .maybeSingle();
 
     res.json({
@@ -97,6 +102,7 @@ router.get('/me', async (req, res) => {
     });
 
   } catch (err) {
+    console.error("ME ERROR:", err);
     res.status(500).json({ error: 'Server error' });
   }
 });

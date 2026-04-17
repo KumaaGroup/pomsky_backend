@@ -5,11 +5,10 @@ require('dotenv').config();
 
 const app = express();
 
+// const cors = require('cors');
+
 app.use(cors({
-  origin: [
-    "https://pomsky-association.webflow.io",
-    "https://your-custom-domain.com"
-  ],
+  origin: 'https://pomsky-association.webflow.io',
   credentials: true
 }));
 
