@@ -185,4 +185,25 @@ router.get('/my-requests', async (req, res) => {
   res.json({ requests: data || [] });
 });
 
+router.get('/meta/states', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('breeder_profiles')
+      .select('state')
+      .eq('is_approved', true)
+      .not('state', 'is', null);
+
+    if (error) throw error;
+
+    const states = [...new Set(data.map(d => d.state))]
+      .filter(Boolean)
+      .sort();
+
+    res.json({ states });
+
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load states' });
+  }
+});
+
 module.exports = router;
