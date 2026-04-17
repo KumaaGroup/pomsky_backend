@@ -242,47 +242,40 @@ router.post('/complete-onboarding', authMiddleware, async (req, res) => {
   } = req.body;
 
   if (!breeder_name) {
-    return res.status(400).json({ error: 'Breeder name is required' });
+    return res.status(400).json({ error: 'Breeder name required' });
   }
 
-  // Check if breeder profile exists
-  const { data: existing } = await supabase
-    .from('breeder_profiles')
-    .select('id')
-    .eq('user_id', req.user.id)
-    .maybeSingle();
+  const { error } = await supabase
+    .from('breeder_requests')
+    .insert({
+      user_id: req.user.id,
+      breeder_name,
+      business_name,
+      state,
+      city,
+      phone,
+      website,
+      bio,
+      status: 'pending'
+    });
 
-  let result;
-  if (existing) {
-    result = await supabase
-      .from('breeder_profiles')
-      .update({
-        breeder_name, business_name,
-        state, city, phone, website, bio,
-        is_onboarded: true
-      })
-      .eq('user_id', req.user.id)
-      .select()
-      .single();
-  } else {
-    result = await supabase
-      .from('breeder_profiles')
-      .insert({
-        user_id: req.user.id,
-        breeder_name, business_name,
-        state, city, phone, website, bio,
-        is_onboarded: true,
-        is_approved: false
-      })
-      .select()
-      .single();
+  if (error) {
+    console.error(error);
+    return res.status(400).json({ error: error.message });
   }
 
-  if (result.error) {
-    return res.status(400).json({ error: result.error.message });
-  }
+  res.json({ message: 'Request submitted for approval' });
+});
 
-  res.json({ message: 'Onboarding complete!', profile: result.data });
+router.get('/breeder-requests', adminAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('breeder_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  res.json({ requests: data });
 });
 
 // Check onboarding status
