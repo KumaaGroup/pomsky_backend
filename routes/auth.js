@@ -74,7 +74,7 @@ router.get('/me', async (req, res) => {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    const userId = data.user.id;
+    const user_id = data.user.id;
 
     // 🔹 Get profile (membership)
     const { data: profile } = await supabase
@@ -87,7 +87,7 @@ router.get('/me', async (req, res) => {
     const { data: breeder } = await supabase
       .from('breeder_profiles')
       .select('is_onboarded')
-      .eq('id', userId)
+      .eq('userid', userId)
       .maybeSingle();
 
     res.json({
