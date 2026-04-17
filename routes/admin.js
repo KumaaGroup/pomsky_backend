@@ -378,61 +378,61 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
   res.json({ message: 'Litter rejected!' });
 });
 
-router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
-  try {
-    // 1. Get request
-    const { data: reqData, error: fetchError } = await supabase
-      .from('breeder_requests')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
+// router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
+//   try {
+//     // 1. Get request
+//     const { data: reqData, error: fetchError } = await supabase
+//       .from('breeder_requests')
+//       .select('*')
+//       .eq('id', req.params.id)
+//       .single();
 
-    if (fetchError || !reqData) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
+//     if (fetchError || !reqData) {
+//       return res.status(404).json({ error: 'Request not found' });
+//     }
 
-    // 2. Insert into breeder_profiles
-    const { error: insertError } = await supabase
-      .from('breeder_profiles')
-      .insert({
-        user_id: reqData.user_id,
-        breeder_name: reqData.breeder_name,
-        business_name: reqData.business_name,
-        state: reqData.state,
-        city: reqData.city,
-        phone: reqData.phone,
-        website: reqData.website,
-        bio: reqData.bio,
-        is_approved: true,
-        is_featured: false
-      });
+//     // 2. Insert into breeder_profiles
+//     const { error: insertError } = await supabase
+//       .from('breeder_profiles')
+//       .insert({
+//         user_id: reqData.user_id,
+//         breeder_name: reqData.breeder_name,
+//         business_name: reqData.business_name,
+//         state: reqData.state,
+//         city: reqData.city,
+//         phone: reqData.phone,
+//         website: reqData.website,
+//         bio: reqData.bio,
+//         is_approved: true,
+//         is_featured: false
+//       });
 
-    if (insertError) {
-      return res.status(400).json({ error: insertError.message });
-    }
+//     if (insertError) {
+//       return res.status(400).json({ error: insertError.message });
+//     }
 
-    // 3. Update request status
-    await supabase
-      .from('breeder_requests')
-      .update({ status: 'approved' })
-      .eq('id', req.params.id);
+//     // 3. Update request status
+//     await supabase
+//       .from('breeder_requests')
+//       .update({ status: 'approved' })
+//       .eq('id', req.params.id);
 
-    res.json({ message: 'Breeder approved' });
+//     res.json({ message: 'Breeder approved' });
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: 'Server error' });
+//   }
+// });
 
-router.patch('/breeder-requests/:id/reject', adminAuth, async (req, res) => {
-  await supabase
-    .from('breeder_requests')
-    .update({ status: 'rejected' })
-    .eq('id', req.params.id);
+// router.patch('/breeder-requests/:id/reject', adminAuth, async (req, res) => {
+//   await supabase
+//     .from('breeder_requests')
+//     .update({ status: 'rejected' })
+//     .eq('id', req.params.id);
 
-  res.json({ message: 'Rejected' });
-});
+//   res.json({ message: 'Rejected' });
+// });
 
 module.exports = router;
 module.exports.adminAuth = adminAuth;
