@@ -21,7 +21,6 @@ router.get('/', async (req, res) => {
         city,
         profile_image,
         website,
-        email,
         phone,
         is_featured,
         is_approved
