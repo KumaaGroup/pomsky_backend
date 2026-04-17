@@ -67,17 +67,24 @@ router.post('/schedule-litter', upload.array('photos'), async (req, res) => {
 const user = userData.user;
 
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('membership_type')
-      .eq('id', user.id)
-      .single();
+  .from('profiles')
+  .select('membership_type')
+  .eq('id', user.id)
+  .single();
 
-    if (!profile) {
+if (!profile) {
   return res.status(400).json({ error: 'Profile not found' });
 }
 
-if (profile.membership_type !== 'breeder_gold') {
-  return res.status(403).json({ error: 'Only Gold members allowed' });
+// ✅ FIXED: allow all breeder types
+const allowedBreeders = [
+  'breeder_free',
+  'breeder_silver',
+  'breeder_gold'
+];
+
+if (!allowedBreeders.includes(profile.membership_type)) {
+  return res.status(403).json({ error: 'Only breeders can submit listings' });
 }
 
 const files = req.files;
