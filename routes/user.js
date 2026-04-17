@@ -245,7 +245,18 @@ router.post('/complete-onboarding', authMiddleware, async (req, res) => {
     return res.status(400).json({ error: 'Breeder name required' });
   }
 
-  const { error } = await supabase
+  const { data: breederProfile, error: fetchError } = await supabase
+    .from('breeder_profiles')
+    .select('id')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error(fetchError);
+    return res.status(500).json({ error: fetchError.message });
+  }
+
+  const { error: requestError } = await supabase
     .from('breeder_requests')
     .insert({
       user_id: req.user.id,
@@ -259,9 +270,55 @@ router.post('/complete-onboarding', authMiddleware, async (req, res) => {
       status: 'pending'
     });
 
-  if (error) {
-    console.error(error);
-    return res.status(400).json({ error: error.message });
+  if (requestError) {
+    console.error(requestError);
+    return res.status(400).json({ error: requestError.message });
+  }
+
+  const breederProfilePayload = {
+    breeder_name,
+    business_name,
+    state,
+    city,
+    phone,
+    website,
+    bio,
+    is_onboarded: true,
+    is_approved: false
+  };
+
+  if (breederProfile) {
+    const { error: updateError } = await supabase
+      .from('breeder_profiles')
+      .update(breederProfilePayload)
+      .eq('user_id', req.user.id);
+
+    if (updateError) {
+      console.error(updateError);
+      return res.status(500).json({ error: updateError.message });
+    }
+  } else {
+    const { error: insertError } = await supabase
+      .from('breeder_profiles')
+      .insert({
+        user_id: req.user.id,
+        ...breederProfilePayload
+      });
+
+    if (insertError) {
+      console.error(insertError);
+      return res.status(500).json({ error: insertError.message });
+    }
+  }
+
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ needs_onboarding: false })
+    .eq('id', req.user.id);
+
+  if (profileError) {
+    console.error(profileError);
+    return res.status(500).json({ error: profileError.message });
   }
 
   res.json({ message: 'Request submitted for approval' });
