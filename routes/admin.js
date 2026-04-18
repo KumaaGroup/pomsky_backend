@@ -474,8 +474,9 @@ router.get('/breeder-requests', adminAuth, async (req, res) => {
     .select(`
       id, status, created_at,
       breeder_name, business_name, email, phone,
-      state, city, website, bio,
-      years_experience, num_litters_per_year,
+      state, city, country, website, bio,
+      profile_image,
+      social_facebook, social_instagram, social_twitter,
       user_id
     `)
     .order('created_at', { ascending: false });
@@ -514,9 +515,15 @@ router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
       business_name: request.business_name,
       state: request.state,
       city: request.city,
+      country: request.country || 'US',
       phone: request.phone,
+      email: request.email,
       website: request.website,
       bio: request.bio,
+      profile_image: request.profile_image || null,
+      social_facebook: request.social_facebook || null,
+      social_instagram: request.social_instagram || null,
+      social_twitter: request.social_twitter || null,
       is_approved: true,
       is_onboarded: true,
       is_featured: false
