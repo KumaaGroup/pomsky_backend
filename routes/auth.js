@@ -130,4 +130,28 @@ router.post('/forgot-password', async (req, res) => {
   res.json({ message: 'Password reset link sent to your email' });
 });
 
+// RESET PASSWORD
+router.post('/reset-password', async (req, res) => {
+  const { access_token, new_password } = req.body;
+
+  if (!access_token || !new_password) {
+    return res.status(400).json({ error: 'Token and new password are required' });
+  }
+
+  if (new_password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  const { error } = await supabase.auth.updateUser(
+    { password: new_password },
+    { access_token }
+  );
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  res.json({ message: 'Password updated successfully' });
+});
+
 module.exports = router;
