@@ -1,0 +1,410 @@
+<div id="breeders-page">
+  <div class="page-layout">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-label">▾ State</div>
+      <ul id="state-list" class="state-list"></ul>
+    </aside>
+
+    <!-- RIGHT MAIN CONTENT -->
+    <main class="main-content">
+      <h1 class="featured-title">Featured POA Pomsky Breeders</h1>
+      <div id="featured-section"></div>
+
+      <h2 class="all-title">All POA-Approved Pomsky Breeders</h2>
+      <div id="other-section"></div>
+    </main>
+
+  </div>
+</div>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+#breeders-page {
+  max-width: 1200px;
+  margin: auto;
+  font-family: 'Inter', Arial, sans-serif;
+  color: #1e293b;
+}
+
+/* ── Layout ── */
+.page-layout {
+  display: flex;
+  gap: 40px;
+  padding: 32px 20px;
+  align-items: flex-start;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 20px;
+}
+
+.sidebar-label {
+  font-weight: 700;
+  font-size: 13px;
+  color: #334155;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.state-list {
+  list-style: none;
+}
+
+.state-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #475569;
+  border-radius: 6px;
+  transition: color 0.2s;
+}
+
+.state-list li::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid #cbd5e1;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.state-list li:hover { color: #0369a1; }
+
+.state-list li.active {
+  color: #0369a1;
+  font-weight: 600;
+}
+.state-list li.active::before {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+}
+
+/* ── Main ── */
+.main-content { flex: 1; min-width: 0; }
+
+/* ── Section Titles ── */
+.featured-title {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #ca8a04;          /* gold — matches image */
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+
+.all-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 48px 0 8px;
+}
+
+/* ── Breeder Card ── */
+.breeder-card {
+  display: flex;
+  gap: 24px;
+  padding: 28px 0;
+  border-top: 1.5px dashed #cbd5e1;
+  align-items: flex-start;
+}
+
+.breeder-card:first-child { border-top: none; }
+
+/* ── Left: Image Column ── */
+.breeder-img-col {
+  width: 130px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.breeder-img {
+  width: 130px;
+  height: 130px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.breeder-img-name {
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+}
+
+/* ── Right: Info Column ── */
+.breeder-info { flex: 1; min-width: 0; }
+
+.breeder-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.breeder-business-name {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.badge-featured {
+  background: #2094b1;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.breeder-bio {
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+
+.breeder-location {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 12px;
+}
+
+/* ── Contact Row ── */
+.breeder-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 0;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.breeder-contact .contact-item {
+  color: #334155;
+  padding-right: 16px;
+  margin-right: 8px;
+  border-right: 1px solid #cbd5e1;
+}
+
+.breeder-contact .contact-item:last-child {
+  border-right: none;
+  padding-right: 0;
+  margin-right: 0;
+}
+
+.breeder-contact a {
+  color: #0ea5e9;
+  text-decoration: none;
+}
+.breeder-contact a:hover { text-decoration: underline; }
+
+/* ── Social Icons ── */
+.breeder-socials {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.social-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  transition: opacity 0.2s, transform 0.2s;
+  flex-shrink: 0;
+}
+.social-icon:hover { opacity: 0.85; transform: scale(1.08); }
+.si-fb { background: #1877f2; }
+.si-ig { background: radial-gradient(circle at 30% 110%, #f09433, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888); }
+.si-tw { background: #111; }
+.si-web { background: #64748b; }
+
+/* ── Empty / Loading ── */
+.no-results {
+  padding: 24px 0;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 860px) {
+  .page-layout { flex-direction: column; gap: 24px; }
+  .sidebar { width: 100%; position: relative; }
+  .state-list { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .featured-title, .all-title { font-size: 1.8rem; }
+}
+
+@media (max-width: 500px) {
+  .breeder-card { flex-direction: column; }
+  .breeder-img-col { width: 100%; flex-direction: row; align-items: center; gap: 16px; }
+  .breeder-img { width: 90px; height: 90px; }
+}
+</style>
+
+<script>
+// const API = 'https://pomsky-backend.onrender.com';
+
+const FALLBACK_IMG = 'https://pomskyownersassociation.com/wp-content/uploads/2021/12/Litter-Coming-Soon-975x1024-5-768x807.jpg';
+
+let selectedState = '';
+
+/**
+ * profile_image and social_* are text[] in Supabase.
+ * Safely returns the first element, or the value itself if it's already a string.
+ */
+function firstOf(val) {
+  if (!val) return null;
+  if (Array.isArray(val)) return val[0] || null;
+  return val;
+}
+
+/* ── Build one breeder card ── */
+function breederCardHTML(b, isFeatured) {
+  const imgUrl = firstOf(b.profile_image);
+  const img    = (imgUrl && imgUrl.startsWith('http')) ? imgUrl : FALLBACK_IMG;
+
+  const location = [b.city, b.state].filter(Boolean).join(', ');
+
+  // Social links (text[])
+  const fbUrl  = firstOf(b.social_facebook);
+  const igUrl  = firstOf(b.social_instagram);
+  const twUrl  = firstOf(b.social_twitter);
+
+  const socialIcons = [
+    fbUrl  ? `<a href="${fbUrl}"  target="_blank" rel="noopener" class="social-icon si-fb"  title="Facebook">f</a>`  : '',
+    igUrl  ? `<a href="${igUrl}" target="_blank" rel="noopener" class="social-icon si-ig"  title="Instagram">&#9679;</a>` : '',
+    twUrl  ? `<a href="${twUrl}" target="_blank" rel="noopener" class="social-icon si-tw"  title="Twitter/X">𝕏</a>` : '',
+    b.website ? `<a href="${b.website}" target="_blank" rel="noopener" class="social-icon si-web" title="Website">&#127760;</a>` : '',
+  ].join('');
+
+  // Contact items — only render if they have a value
+  const contactItems = [
+    b.breeder_name ? `<span class="contact-item">${b.breeder_name}</span>` : '',
+    b.phone   ? `<span class="contact-item">${b.phone}</span>` : '',
+    b.email   ? `<span class="contact-item"><a href="mailto:${b.email}">${b.email}</a></span>` : '',
+    b.website ? `<span class="contact-item"><a href="${b.website}" target="_blank" rel="noopener">${b.website.replace(/^https?:\/\//, '')}</a></span>` : '',
+  ].filter(Boolean).join('');
+
+  return `
+    <div class="breeder-card">
+
+      <!-- Left: photo + caption -->
+      <div class="breeder-img-col">
+        <img
+          src="${img}"
+          class="breeder-img"
+          alt="${b.business_name || b.breeder_name || 'Breeder'}"
+          onerror="this.onerror=null;this.src='${FALLBACK_IMG}';"
+        />
+        <div class="breeder-img-name">${b.business_name || b.breeder_name || ''}</div>
+      </div>
+
+      <!-- Right: details -->
+      <div class="breeder-info">
+        <div class="breeder-header">
+          <span class="breeder-business-name">${b.business_name || b.breeder_name || 'Breeder'}</span>
+          ${isFeatured ? '<span class="badge-featured">Featured Breeder</span>' : ''}
+        </div>
+
+        ${b.bio ? `<p class="breeder-bio">${b.bio}</p>` : ''}
+
+        ${location ? `<div class="breeder-location">${location}</div>` : ''}
+
+        ${contactItems ? `<div class="breeder-contact">${contactItems}</div>` : ''}
+
+        ${socialIcons ? `<div class="breeder-socials">${socialIcons}</div>` : ''}
+      </div>
+
+    </div>
+  `;
+}
+
+/* ── Render list into a container ── */
+function renderBreeders(containerId, breeders, isFeatured) {
+  const el = document.getElementById(containerId);
+  if (!breeders || !breeders.length) {
+    el.innerHTML = '<p class="no-results">No breeders found.</p>';
+    return;
+  }
+  el.innerHTML = breeders.map(b => breederCardHTML(b, isFeatured)).join('');
+}
+
+/* ── Fetch breeders ── */
+async function loadBreeders() {
+  document.getElementById('featured-section').innerHTML = '<p class="no-results">Loading...</p>';
+  document.getElementById('other-section').innerHTML    = '';
+  try {
+    const url = `${API}/breeder${selectedState ? `?state=${encodeURIComponent(selectedState)}` : ''}`;
+    const res  = await fetch(url, { credentials: 'include' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderBreeders('featured-section', data.featured || [], true);
+    renderBreeders('other-section',    data.normal   || [], false);
+  } catch (err) {
+    console.error('Breeder load error:', err);
+    document.getElementById('featured-section').innerHTML = '<p class="no-results">Failed to load breeders.</p>';
+    document.getElementById('other-section').innerHTML    = '';
+  }
+}
+
+/* ── Fetch states for sidebar ── */
+async function loadStates() {
+  try {
+    const res  = await fetch(`${API}/breeder/meta/states`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const list = document.getElementById('state-list');
+
+    const allLi = document.createElement('li');
+    allLi.textContent = 'All';
+    allLi.className   = 'active';
+    allLi.onclick     = () => { selectedState = ''; setActiveState(allLi); loadBreeders(); };
+    list.appendChild(allLi);
+
+    (data.states || []).forEach(state => {
+      const li = document.createElement('li');
+      li.textContent = state;
+      li.onclick = () => { selectedState = state; setActiveState(li); loadBreeders(); };
+      list.appendChild(li);
+    });
+  } catch (err) {
+    console.error('State load error:', err);
+  }
+}
+
+function setActiveState(activeLi) {
+  document.querySelectorAll('.state-list li').forEach(li => li.classList.remove('active'));
+  activeLi.classList.add('active');
+}
+
+loadStates();
+loadBreeders();
+</script>

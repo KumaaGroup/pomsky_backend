@@ -19,9 +19,14 @@ router.get('/', async (req, res) => {
         business_name,
         state,
         city,
-        profile_image,
-        website,
+        bio,
+        email,
         phone,
+        website,
+        profile_image,
+        social_facebook,
+        social_instagram,
+        social_twitter,
         is_featured,
         is_approved
       `)
