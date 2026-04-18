@@ -36,7 +36,9 @@ router.post('/login', async (req, res) => {
 
   if (error) return res.status(401).json({ error: error.message });
 
-  res.cookie('token', data.session.access_token, {
+  const accessToken = data.session?.access_token;
+
+  res.cookie('token', accessToken, {
     httpOnly: true,
     secure: true,
     sameSite: 'None',
@@ -46,6 +48,7 @@ router.post('/login', async (req, res) => {
   res.json({
     message: 'Logged in!',
     user: data.user,
+    access_token: accessToken,
     redirect: '/dashboard'
   });
 });
@@ -64,8 +67,9 @@ router.post('/logout', async (req, res) => {
 router.get('/me', async (req, res) => {
   try {
     console.log("COOKIE:", req.cookies);
+    console.log("AUTH HEADER:", req.headers.authorization);
 
-    const token = req.cookies.token;
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
 
     if (!token) {
       console.log("NO TOKEN");
