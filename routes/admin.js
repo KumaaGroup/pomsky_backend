@@ -500,7 +500,7 @@ router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
 
     const { data: existingBreeder, error: breederFetchError } = await supabase
       .from('breeder_profiles')
-      .select('id')
+      .select('id, is_featured')   // also fetch is_featured to preserve manual overrides
       .eq('user_id', request.user_id)
       .maybeSingle();
 
@@ -508,6 +508,17 @@ router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
       console.error('BREEDER PROFILE FETCH ERROR:', breederFetchError);
       return res.status(500).json({ error: breederFetchError.message });
     }
+
+    // Fetch user's membership so gold breeders are auto-featured on approval
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('membership_type')
+      .eq('id', request.user_id)
+      .maybeSingle();
+
+    const isGold = userProfile?.membership_type === 'breeder_gold';
+    // Preserve existing is_featured if already manually set, otherwise base on membership
+    const isFeatured = existingBreeder?.is_featured || isGold;
 
     const breederPayload = {
       user_id: request.user_id,
@@ -526,7 +537,7 @@ router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
       social_twitter: request.social_twitter || null,
       is_approved: true,
       is_onboarded: true,
-      is_featured: false
+      is_featured: isFeatured  // ✅ gold = auto-featured, silver/free = false
     };
 
     if (existingBreeder) {

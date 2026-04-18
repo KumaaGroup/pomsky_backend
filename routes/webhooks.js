@@ -152,7 +152,7 @@ if (isPaidBreeder) {
 
           const { data: profile } = await supabase
             .from('profiles')
-            .select('account_type')
+            .select('id, account_type, membership_type')
             .eq('stripe_customer_id', subscription.customer)
             .single();
 
@@ -172,6 +172,15 @@ if (isPaidBreeder) {
               stripe_subscription_id: null
             })
             .eq('stripe_customer_id', subscription.customer);
+
+          // If they were gold, remove featured status from their breeder profile
+          if (profile?.membership_type === 'breeder_gold' && profile?.id) {
+            await supabase
+              .from('breeder_profiles')
+              .update({ is_featured: false })
+              .eq('user_id', profile.id);
+            console.log('Gold breeder downgraded — removed featured status');
+          }
 
           console.log('Subscription cancelled, downgraded to:', freeTier);
           break;
