@@ -111,4 +111,23 @@ router.get('/me', async (req, res) => {
   }
 });
 
+// FORGOT PASSWORD
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.FRONTEND_URL}/reset-password`
+  });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  res.json({ message: 'Password reset link sent to your email' });
+});
+
 module.exports = router;
