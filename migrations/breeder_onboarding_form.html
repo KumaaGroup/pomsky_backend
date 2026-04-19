@@ -1,0 +1,576 @@
+<style>
+.onboard-wrap {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 0 20px;
+  font-family: inherit;
+}
+
+.onboard-step {
+  display: none;
+}
+
+.onboard-step.active {
+  display: block;
+}
+
+.onboard-progress {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  transition: background 0.3s;
+}
+
+.progress-dot.done {
+  background: rgb(32, 148, 177);
+}
+
+.onboard-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.onboard-subtitle {
+  font-size: 15px;
+  color: #64748b;
+  margin-bottom: 32px;
+}
+
+.onboard-label {
+  display: block;
+  font-size: 13px;
+  color: #475569;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.onboard-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  margin-bottom: 16px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.onboard-input:focus {
+  border-color: rgb(32, 148, 177);
+}
+
+.onboard-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  resize: vertical;
+  min-height: 100px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.onboard-textarea:focus {
+  border-color: rgb(32, 148, 177);
+}
+
+.onboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Profile image upload area */
+.onboard-image-upload {
+  border: 2px dashed #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  margin-bottom: 16px;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.onboard-image-upload:hover {
+  border-color: rgb(32, 148, 177);
+  background: #f0f9ff;
+}
+.onboard-image-upload input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.onboard-image-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto 8px;
+  display: none;
+  border: 3px solid rgb(32, 148, 177);
+}
+.upload-icon {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+.upload-hint {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* Social input with icon prefix */
+.social-input-wrap {
+  position: relative;
+  margin-bottom: 16px;
+}
+.social-prefix {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+.social-input-wrap .onboard-input {
+  padding-left: 90px;
+  margin-bottom: 0;
+}
+
+.onboard-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 32px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid rgb(229, 231, 235);
+  background: rgb(32, 148, 177);
+  color: white;
+  width: 100%;
+  margin-top: 8px;
+  filter: drop-shadow(rgba(32,148,177,0.1) 0px 1px 3px);
+}
+
+.onboard-btn:hover { opacity: 0.9; }
+.onboard-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.onboard-btn-outline {
+  background: white;
+  color: rgb(32, 148, 177);
+  border-color: rgb(32, 148, 177);
+  margin-top: 12px;
+}
+
+.onboard-error {
+  color: red;
+  font-size: 13px;
+  margin-bottom: 12px;
+  display: none;
+}
+
+.success-icon {
+  width: 72px;
+  height: 72px;
+  background: #dcfce7;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+}
+
+@media (max-width: 480px) {
+  .onboard-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="onboard-wrap">
+
+  <!-- Progress dots (4 data steps) -->
+  <div class="onboard-progress">
+    <div class="progress-dot done" id="dot-1"></div>
+    <div class="progress-dot" id="dot-2"></div>
+    <div class="progress-dot" id="dot-3"></div>
+    <div class="progress-dot" id="dot-4"></div>
+  </div>
+
+  <!-- ── Step 1: Welcome ── -->
+  <div class="onboard-step active" id="step-1">
+    <h1 class="onboard-title">Welcome to POA Breeders! 🐾</h1>
+    <p class="onboard-subtitle">
+      Your payment was successful. Let's set up your breeder profile so 
+      Pomsky buyers can find you. This only takes 2 minutes.
+    </p>
+    <div style="background:#f0f9ff; border-radius:12px; padding:20px; margin-bottom:28px;">
+      <p style="font-size:14px; font-weight:600; color:#0369a1; margin-bottom:12px;">
+        What you get as a POA Breeder:
+      </p>
+      <div style="display:flex; flex-direction:column; gap:8px;" id="benefits-list"></div>
+    </div>
+    <button class="onboard-btn" onclick="goToStep(2)">
+      Set Up My Profile →
+    </button>
+  </div>
+
+  <!-- ── Step 2: Basic Info ── -->
+  <div class="onboard-step" id="step-2">
+    <h1 class="onboard-title">Tell us about your kennel</h1>
+    <p class="onboard-subtitle">This information will appear on your breeder profile.</p>
+
+    <p class="onboard-error" id="step2-error"></p>
+
+    <label class="onboard-label">Your Full Name *</label>
+    <input class="onboard-input" id="ob-breeder-name" placeholder="e.g. John Smith" />
+
+    <label class="onboard-label">Kennel / Business Name</label>
+    <input class="onboard-input" id="ob-business-name" placeholder="e.g. Arctic Tails Pomskies" />
+
+    <div class="onboard-grid">
+      <div>
+        <label class="onboard-label">State *</label>
+        <input class="onboard-input" id="ob-state" placeholder="e.g. California" />
+      </div>
+      <div>
+        <label class="onboard-label">City</label>
+        <input class="onboard-input" id="ob-city" placeholder="e.g. Los Angeles" />
+      </div>
+    </div>
+
+    <label class="onboard-label">Country</label>
+    <select class="onboard-input" id="ob-country">
+      <option value="US">United States</option>
+      <option value="CA">Canada</option>
+      <option value="GB">United Kingdom</option>
+      <option value="AU">Australia</option>
+      <option value="Other">Other</option>
+    </select>
+
+    <button class="onboard-btn" onclick="validateStep2()">
+      Continue →
+    </button>
+    <button class="onboard-btn onboard-btn-outline" onclick="goToStep(1)">
+      ← Back
+    </button>
+  </div>
+
+  <!-- ── Step 3: Contact & Profile Photo ── -->
+  <div class="onboard-step" id="step-3">
+    <h1 class="onboard-title">Contact & Profile Photo</h1>
+    <p class="onboard-subtitle">How can buyers reach you? Add a photo to build trust.</p>
+
+    <p class="onboard-error" id="step3-error"></p>
+
+    <!-- Profile photo upload -->
+    <label class="onboard-label">Profile Photo</label>
+    <div class="onboard-image-upload" id="image-upload-area">
+      <input type="file" id="ob-profile-image" accept="image/*" onchange="previewImage(this)" />
+      <img id="ob-image-preview" class="onboard-image-preview" alt="Preview" />
+      <div id="upload-placeholder">
+        <div class="upload-icon">📷</div>
+        <div style="font-size:14px; font-weight:600; color:#475569;">Click to upload a photo</div>
+        <div class="upload-hint">JPG, PNG or WebP · Max 5MB</div>
+      </div>
+    </div>
+
+    <label class="onboard-label">Email Address *</label>
+    <input class="onboard-input" id="ob-email" placeholder="e.g. you@yourkennel.com" type="email" />
+
+    <div class="onboard-grid">
+      <div>
+        <label class="onboard-label">Phone Number</label>
+        <input class="onboard-input" id="ob-phone" placeholder="e.g. (555) 123-4567" type="tel" />
+      </div>
+      <div>
+        <label class="onboard-label">Website URL</label>
+        <input class="onboard-input" id="ob-website" placeholder="https://yourkennel.com" />
+      </div>
+    </div>
+
+    <button class="onboard-btn" onclick="validateStep3()">
+      Continue →
+    </button>
+    <button class="onboard-btn onboard-btn-outline" onclick="goToStep(2)">
+      ← Back
+    </button>
+  </div>
+
+  <!-- ── Step 4: Social Links & Bio ── -->
+  <div class="onboard-step" id="step-4">
+    <h1 class="onboard-title">Social Links & Bio</h1>
+    <p class="onboard-subtitle">Let buyers follow your journey. These are all optional.</p>
+
+    <p class="onboard-error" id="step4-error"></p>
+
+    <label class="onboard-label">Facebook</label>
+    <div class="social-input-wrap">
+      <span class="social-prefix">facebook.com/</span>
+      <input class="onboard-input" id="ob-facebook" placeholder="yourpage" />
+    </div>
+
+    <label class="onboard-label">Instagram</label>
+    <div class="social-input-wrap">
+      <span class="social-prefix">instagram.com/</span>
+      <input class="onboard-input" id="ob-instagram" placeholder="yourhandle" />
+    </div>
+
+    <label class="onboard-label">Twitter / X</label>
+    <div class="social-input-wrap">
+      <span class="social-prefix">x.com/</span>
+      <input class="onboard-input" id="ob-twitter" placeholder="yourhandle" />
+    </div>
+
+    <label class="onboard-label">About Your Kennel</label>
+    <textarea class="onboard-textarea" id="ob-bio"
+      placeholder="Tell buyers about your breeding program, experience, and what makes your Pomskies special...">
+    </textarea>
+
+    <button class="onboard-btn" id="submit-onboarding-btn" onclick="submitOnboarding()">
+      Complete Setup →
+    </button>
+    <button class="onboard-btn onboard-btn-outline" onclick="goToStep(3)">
+      ← Back
+    </button>
+  </div>
+
+  <!-- ── Step 5: Success ── -->
+  <div class="onboard-step" id="step-5">
+    <div style="text-align:center; padding:20px 0;">
+      <div class="success-icon">
+        <svg width="36" height="36" fill="none" stroke="#16a34a" stroke-width="2.5" viewBox="0 0 24 24">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <h1 class="onboard-title" style="text-align:center;">You're all set! 🎉</h1>
+      <p class="onboard-subtitle" style="text-align:center;">
+        Your breeder profile has been submitted. Our team will review and 
+        approve it shortly. You can now access your Breeder Portal.
+      </p>
+      <div style="background:#f0f9ff; border-radius:12px; padding:20px; margin:24px 0; text-align:left;">
+        <p style="font-size:14px; font-weight:600; color:#0369a1; margin-bottom:8px;">Next steps:</p>
+        <p style="font-size:14px; color:#334155; margin-bottom:6px;">✅ Profile submitted for review</p>
+        <p style="font-size:14px; color:#334155; margin-bottom:6px;">📋 Add your first Pomsky listing</p>
+        <p style="font-size:14px; color:#334155; margin-bottom:6px;">🏆 Get approved and start getting buyers</p>
+      </div>
+      <button class="onboard-btn" onclick="window.location.href='/dashboard'">
+        Go to My Dashboard
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// const API = 'https://pomsky-backend.onrender.com';
+
+const TOTAL_STEPS = 4; // excludes welcome & success
+
+const membershipBenefits = {
+  breeder_silver: [
+    '✅ Access to Breeders Portal',
+    '✅ Listed as POA-approved breeder',
+    '✅ 15% discount on Pomsky Swag Shop',
+    '✅ Listed on Available Pomskies page (updated weekly)',
+    '✅ Guest spot on Pomsky 101 Podcast'
+  ],
+  breeder_gold: [
+    '✅ Everything in Silver',
+    '⭐ Featured listing on POA approved breeder list',
+    '📧 Personal litter update email blast 1x/month',
+    '📘 Personal litter update on POA Facebook 1x/month',
+    '📸 Personal litter update on POA Instagram 1x/month'
+  ],
+  breeder_free: [
+    '✅ Access to Breeders Portal',
+    '✅ Listed as POA-approved breeder',
+    '✅ 15% discount on Pomsky Swag Shop'
+  ]
+};
+
+let currentStep = 1;
+let membershipType = '';
+
+async function initOnboarding() {
+  try {
+    const res = await fetch(`${API}/auth/me`, { credentials: 'include' });
+    if (!res.ok) { window.location.href = '/login'; return; }
+
+    const data = await res.json();
+    membershipType = data.membership_type || 'breeder_free';
+
+    if (data.is_onboarded)  { window.location.href = '/dashboard'; return; }
+
+    const isBreeder = ['breeder_free', 'breeder_silver', 'breeder_gold'].includes(membershipType);
+    if (!isBreeder) { window.location.href = '/dashboard'; return; }
+
+    const benefits = membershipBenefits[membershipType] || membershipBenefits.breeder_free;
+    document.getElementById('benefits-list').innerHTML = benefits
+      .map(b => `<p style="font-size:14px; color:#334155; margin:0;">${b}</p>`)
+      .join('');
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function goToStep(step) {
+  document.querySelectorAll('.onboard-step').forEach(s => s.classList.remove('active'));
+  document.getElementById(`step-${step}`).classList.add('active');
+
+  // Update progress dots (dots 1-4 map to steps 1-4)
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const dot = document.getElementById(`dot-${i}`);
+    if (dot) dot.classList.toggle('done', i <= step);
+  }
+
+  currentStep = step;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Image preview ──
+function previewImage(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Image must be under 5 MB');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const preview = document.getElementById('ob-image-preview');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    document.getElementById('upload-placeholder').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Validation ──
+function validateStep2() {
+  const errorEl = document.getElementById('step2-error');
+  errorEl.style.display = 'none';
+
+  if (!document.getElementById('ob-breeder-name').value.trim()) {
+    errorEl.textContent = 'Please enter your full name';
+    errorEl.style.display = 'block';
+    return;
+  }
+  if (!document.getElementById('ob-state').value.trim()) {
+    errorEl.textContent = 'Please enter your state';
+    errorEl.style.display = 'block';
+    return;
+  }
+  goToStep(3);
+}
+
+function validateStep3() {
+  const errorEl = document.getElementById('step3-error');
+  errorEl.style.display = 'none';
+
+  const email = document.getElementById('ob-email').value.trim();
+  if (!email) {
+    errorEl.textContent = 'Please enter your email address';
+    errorEl.style.display = 'block';
+    return;
+  }
+  // Basic email format check
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errorEl.textContent = 'Please enter a valid email address';
+    errorEl.style.display = 'block';
+    return;
+  }
+  goToStep(4);
+}
+
+// ── Helper: build a full URL from a social handle/URL ──
+function toFullSocialUrl(prefix, value) {
+  if (!value) return null;
+  value = value.trim();
+  if (!value) return null;
+  // Already a full URL — return as-is
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  return `https://${prefix}${value}`;
+}
+
+// ── Submit as multipart/form-data (required for image upload via multer) ──
+async function submitOnboarding() {
+  const errorEl = document.getElementById('step4-error');
+  const btn     = document.getElementById('submit-onboarding-btn');
+  errorEl.style.display = 'none';
+
+  const facebook  = toFullSocialUrl('facebook.com/', document.getElementById('ob-facebook').value);
+  const instagram = toFullSocialUrl('instagram.com/', document.getElementById('ob-instagram').value);
+  const twitter   = toFullSocialUrl('x.com/', document.getElementById('ob-twitter').value);
+
+  // Build FormData so the image file is sent alongside the text fields
+  const formData = new FormData();
+  formData.append('breeder_name',  document.getElementById('ob-breeder-name').value.trim());
+  formData.append('business_name', document.getElementById('ob-business-name').value.trim());
+  formData.append('state',         document.getElementById('ob-state').value.trim());
+  formData.append('city',          document.getElementById('ob-city').value.trim());
+  formData.append('country',       document.getElementById('ob-country').value);
+  formData.append('email',         document.getElementById('ob-email').value.trim());
+  formData.append('phone',         document.getElementById('ob-phone').value.trim());
+  formData.append('website',       document.getElementById('ob-website').value.trim());
+  formData.append('bio',           document.getElementById('ob-bio').value.trim());
+
+  if (facebook)  formData.append('social_facebook',  facebook);
+  if (instagram) formData.append('social_instagram', instagram);
+  if (twitter)   formData.append('social_twitter',   twitter);
+
+  // Attach image file if selected
+  const imageFile = document.getElementById('ob-profile-image').files[0];
+  if (imageFile) {
+    formData.append('profile_image', imageFile);
+  }
+
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  try {
+    // NOTE: Do NOT set Content-Type header — browser sets it automatically with boundary for multipart
+    const res = await fetch(`${API}/user/complete-onboarding`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      goToStep(5);
+    } else {
+      errorEl.textContent = data.error || 'Failed to save profile';
+      errorEl.style.display = 'block';
+      btn.textContent = 'Complete Setup →';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    errorEl.textContent = 'Something went wrong. Please try again.';
+    errorEl.style.display = 'block';
+    btn.textContent = 'Complete Setup →';
+    btn.disabled = false;
+  }
+}
+
+// Start
+initOnboarding();
+</script>

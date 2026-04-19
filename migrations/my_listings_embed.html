@@ -1,0 +1,743 @@
+<!-- ═══════════════════════════════════════════════════
+     MY LITTER LISTINGS — Breeder Portal Embed
+     Place this in a Webflow Custom Code / Embed block
+     inside your Breeder Portal section.
+     Requires: const API = '...' already defined above it
+     (same as your other portal embeds).
+═══════════════════════════════════════════════════ -->
+
+<style>
+/* ── My Listings Section ── */
+.ml-section {
+  max-width: 860px;
+  margin: 0 auto;
+  font-family: 'Quicksand', Arial, sans-serif;
+  color: #1e293b;
+}
+
+.ml-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.ml-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.ml-btn-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  background: rgb(32,148,177);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.ml-btn-add:hover { opacity: .85; }
+
+/* ── Listing Cards ── */
+.ml-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ml-card {
+  display: flex;
+  gap: 20px;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px;
+  align-items: flex-start;
+  transition: box-shadow .2s;
+}
+.ml-card:hover { box-shadow: 0 4px 20px rgba(32,148,177,.1); }
+
+.ml-card-thumb {
+  width: 100px;
+  height: 100px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.ml-card-body { flex: 1; min-width: 0; }
+
+.ml-card-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.ml-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ml-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.ml-badge-avail  { background: #dcfce7; color: #15803d; }
+.ml-badge-pending{ background: #fef9c3; color: #854d0e; }
+.ml-badge-sold   { background: #fee2e2; color: #b91c1c; }
+.ml-badge-gender { background: #f0f9ff; color: #0369a1; }
+.ml-badge-type   { background: #f5f3ff; color: #6d28d9; }
+.ml-badge-new    { background: #fff7ed; color: #c2410c; }
+
+.ml-card-desc {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+  margin-bottom: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ml-card-price {
+  font-size: 15px;
+  font-weight: 700;
+  color: rgb(32,148,177);
+  margin-bottom: 10px;
+}
+
+.ml-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ml-btn-edit {
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid rgb(32,148,177);
+  background: transparent;
+  color: rgb(32,148,177);
+  transition: background .2s, color .2s;
+}
+.ml-btn-edit:hover { background: rgb(32,148,177); color: #fff; }
+
+.ml-btn-delete {
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid #fca5a5;
+  background: transparent;
+  color: #dc2626;
+  transition: background .2s, color .2s;
+}
+.ml-btn-delete:hover { background: #dc2626; color: #fff; }
+
+.ml-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: #94a3b8;
+  font-size: 15px;
+  border: 2px dashed #e2e8f0;
+  border-radius: 14px;
+}
+.ml-empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+/* ── Modal ── */
+.ml-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.55);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.ml-overlay.open { display: flex; }
+
+.ml-modal {
+  background: #fff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px;
+  position: relative;
+  box-shadow: 0 24px 60px rgba(0,0,0,.18);
+}
+
+.ml-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: background .2s;
+}
+.ml-modal-close:hover { background: #e2e8f0; }
+
+.ml-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 22px;
+  padding-right: 40px;
+}
+
+.ml-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+
+.ml-input, .ml-select, .ml-textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+  transition: border-color .2s;
+  color: #1e293b;
+}
+.ml-input:focus, .ml-select:focus, .ml-textarea:focus {
+  border-color: rgb(32,148,177);
+}
+.ml-textarea { min-height: 90px; resize: vertical; }
+
+.ml-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* Image manager inside modal */
+.ml-img-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.ml-img-thumb-wrap {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+.ml-img-thumb {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+.ml-img-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.ml-upload-area {
+  border: 2px dashed #e2e8f0;
+  border-radius: 10px;
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  margin-bottom: 14px;
+  position: relative;
+  transition: border-color .2s, background .2s;
+}
+.ml-upload-area:hover { border-color: rgb(32,148,177); background: #f0f9ff; }
+.ml-upload-area input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.ml-upload-hint { font-size: 13px; color: #94a3b8; }
+
+.ml-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.ml-checkbox-row input { width: 16px; height: 16px; accent-color: rgb(32,148,177); }
+.ml-checkbox-row label { font-size: 14px; color: #334155; }
+
+.ml-submit-btn {
+  width: 100%;
+  padding: 13px;
+  background: rgb(32,148,177);
+  color: #fff;
+  border: none;
+  border-radius: 11px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: opacity .2s;
+}
+.ml-submit-btn:hover { opacity: .88; }
+.ml-submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+.ml-form-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin-bottom: 12px;
+  display: none;
+}
+.ml-form-success {
+  color: #15803d;
+  font-size: 13px;
+  margin-bottom: 12px;
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .ml-card { flex-direction: column; }
+  .ml-card-thumb { width: 100%; height: 160px; }
+  .ml-row { grid-template-columns: 1fr; gap: 0; }
+  .ml-modal { padding: 22px 16px; }
+}
+</style>
+
+<!-- ── Section ── -->
+<div class="ml-section" id="my-listings-section">
+
+  <div class="ml-header">
+    <div class="ml-title">🐾 My Litter Listings</div>
+    <button class="ml-btn-add" onclick="mlOpenModal(null)">+ Add New Listing</button>
+  </div>
+
+  <div class="ml-grid" id="ml-grid">
+    <div class="ml-empty">
+      <div class="ml-empty-icon">🐕</div>
+      Loading your listings...
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Edit / Add Modal ── -->
+<div class="ml-overlay" id="ml-overlay">
+  <div class="ml-modal">
+    <button class="ml-modal-close" onclick="mlCloseModal()">✕</button>
+    <div class="ml-modal-title" id="ml-modal-title">Add New Listing</div>
+
+    <p class="ml-form-error" id="ml-error"></p>
+    <p class="ml-form-success" id="ml-success"></p>
+
+    <!-- Images -->
+    <label class="ml-label">Current Images</label>
+    <div class="ml-img-grid" id="ml-img-grid"></div>
+
+    <div class="ml-upload-area">
+      <input type="file" id="ml-new-images" accept="image/*" multiple onchange="mlPreviewNew(this)" />
+      <div>📷</div>
+      <div style="font-size:13px;font-weight:600;color:#475569;margin-top:4px;">Click to upload new images</div>
+      <div class="ml-upload-hint">JPG, PNG or WebP · Max 5MB each</div>
+    </div>
+
+    <div id="ml-new-previews" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;"></div>
+
+    <!-- Name -->
+    <label class="ml-label">Listing Name / Puppy Name</label>
+    <input class="ml-input" id="ml-name" placeholder="e.g. Arctic Blue Pomsky Litter" />
+
+    <!-- Description -->
+    <label class="ml-label">Description</label>
+    <textarea class="ml-textarea" id="ml-desc" placeholder="Describe the litter, health info, temperament..."></textarea>
+
+    <!-- Row: gender + type -->
+    <div class="ml-row">
+      <div>
+        <label class="ml-label">Gender</label>
+        <select class="ml-select" id="ml-gender">
+          <option value="">Any / Mixed</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml-label">Pomsky Type</label>
+        <input class="ml-input" id="ml-type" placeholder="e.g. F1, F2, F1B" />
+      </div>
+    </div>
+
+    <!-- Markings -->
+    <label class="ml-label">Markings / Coat</label>
+    <input class="ml-input" id="ml-markings" placeholder="e.g. Husky markings, blue eyes" />
+
+    <!-- Row: price + availability -->
+    <div class="ml-row">
+      <div>
+        <label class="ml-label">Price (USD)</label>
+        <input class="ml-input" id="ml-price" type="number" min="0" placeholder="e.g. 2500" />
+      </div>
+      <div>
+        <label class="ml-label">Availability</label>
+        <select class="ml-select" id="ml-availability">
+          <option value="available">Available</option>
+          <option value="reserved">Reserved</option>
+          <option value="sold">Sold</option>
+          <option value="coming_soon">Coming Soon</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Row: state + city -->
+    <div class="ml-row">
+      <div>
+        <label class="ml-label">State</label>
+        <input class="ml-input" id="ml-state" placeholder="e.g. California" />
+      </div>
+      <div>
+        <label class="ml-label">City</label>
+        <input class="ml-input" id="ml-city" placeholder="e.g. Los Angeles" />
+      </div>
+    </div>
+
+    <!-- New litter -->
+    <div class="ml-checkbox-row">
+      <input type="checkbox" id="ml-new-litter" />
+      <label for="ml-new-litter">Mark as New Litter 🆕</label>
+    </div>
+
+    <button class="ml-submit-btn" id="ml-submit-btn" onclick="mlSubmit()">Save Listing</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ── State ──
+  let listings = [];
+  let editingId = null;
+  let keptImages = [];     // existing image URLs the breeder wants to keep
+  let newFilesList = [];   // File objects staged for upload
+
+  const FALLBACK = 'https://pomskyownersassociation.com/wp-content/uploads/2021/12/Litter-Coming-Soon-975x1024-5-768x807.jpg';
+
+  // ── Badge helper ──
+  function availBadge(a) {
+    const map = {
+      available:   ['ml-badge-avail',  'Available'],
+      reserved:    ['ml-badge-pending','Reserved'],
+      sold:        ['ml-badge-sold',   'Sold'],
+      coming_soon: ['ml-badge-pending','Coming Soon'],
+    };
+    const [cls, label] = map[a] || ['ml-badge-avail', a || 'Available'];
+    return `<span class="ml-badge ${cls}">${label}</span>`;
+  }
+
+  // ── Render card ──
+  function cardHTML(l) {
+    const thumb = (l.images && l.images[0]) ? l.images[0] : FALLBACK;
+    const price = l.price ? `$${Number(l.price).toLocaleString()}` : 'Contact for price';
+    const loc   = [l.city, l.state].filter(Boolean).join(', ');
+    return `
+      <div class="ml-card" id="card-${l.id}">
+        <img class="ml-card-thumb"
+             src="${thumb}"
+             alt="${l.name || 'Listing'}"
+             onerror="this.onerror=null;this.src='${FALLBACK}';" />
+        <div class="ml-card-body">
+          <div class="ml-card-name">${l.name || 'Unnamed Listing'}</div>
+          <div class="ml-card-meta">
+            ${availBadge(l.availability)}
+            ${l.gender  ? `<span class="ml-badge ml-badge-gender">${l.gender}</span>` : ''}
+            ${l.pomsky_type ? `<span class="ml-badge ml-badge-type">${l.pomsky_type}</span>` : ''}
+            ${l.is_new_litter ? `<span class="ml-badge ml-badge-new">New Litter</span>` : ''}
+            ${!l.is_active ? `<span class="ml-badge ml-badge-pending">Pending Approval</span>` : ''}
+          </div>
+          ${l.description ? `<div class="ml-card-desc">${l.description}</div>` : ''}
+          <div class="ml-card-price">${price}${loc ? ` &bull; ${loc}` : ''}</div>
+          <div class="ml-card-actions">
+            <button class="ml-btn-edit"   onclick="mlOpenModal('${l.id}')">✏️ Edit</button>
+            <button class="ml-btn-delete" onclick="mlDelete('${l.id}')">🗑 Delete</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ── Render grid ──
+  function renderGrid() {
+    const grid = document.getElementById('ml-grid');
+    if (!listings.length) {
+      grid.innerHTML = `
+        <div class="ml-empty">
+          <div class="ml-empty-icon">🐕</div>
+          You haven't added any listings yet.<br>
+          <strong style="color:#2094b1;cursor:pointer;" onclick="mlOpenModal(null)">Add your first listing →</strong>
+        </div>`;
+      return;
+    }
+    grid.innerHTML = listings.map(cardHTML).join('');
+  }
+
+  // ── Load listings ──
+  async function loadListings() {
+    try {
+      const res  = await fetch(`${API}/user/my-listings`, { credentials: 'include' });
+      const data = await res.json();
+      listings   = data.listings || [];
+      renderGrid();
+    } catch (e) {
+      document.getElementById('ml-grid').innerHTML =
+        '<div class="ml-empty"><div class="ml-empty-icon">⚠️</div>Failed to load listings.</div>';
+    }
+  }
+
+  // ── Open modal ──
+  window.mlOpenModal = function (id) {
+    editingId    = id;
+    keptImages   = [];
+    newFilesList = [];
+
+    const title  = document.getElementById('ml-modal-title');
+    const imgGrid = document.getElementById('ml-img-grid');
+    const newPrev = document.getElementById('ml-new-previews');
+    document.getElementById('ml-new-images').value = '';
+    newPrev.innerHTML = '';
+
+    hideMessages();
+
+    if (id) {
+      const l = listings.find(x => x.id === id);
+      if (!l) return;
+      title.textContent = 'Edit Listing';
+      keptImages = l.images ? [...l.images] : [];
+
+      // populate fields
+      document.getElementById('ml-name').value         = l.name || '';
+      document.getElementById('ml-desc').value         = l.description || '';
+      document.getElementById('ml-gender').value       = l.gender || '';
+      document.getElementById('ml-type').value         = l.pomsky_type || '';
+      document.getElementById('ml-markings').value     = l.markings || '';
+      document.getElementById('ml-price').value        = l.price || '';
+      document.getElementById('ml-availability').value = l.availability || 'available';
+      document.getElementById('ml-state').value        = l.state || '';
+      document.getElementById('ml-city').value         = l.city || '';
+      document.getElementById('ml-new-litter').checked = !!l.is_new_litter;
+    } else {
+      title.textContent = 'Add New Listing';
+      keptImages = [];
+      ['ml-name','ml-desc','ml-type','ml-markings','ml-price','ml-state','ml-city']
+        .forEach(id => { document.getElementById(id).value = ''; });
+      document.getElementById('ml-gender').value       = '';
+      document.getElementById('ml-availability').value = 'available';
+      document.getElementById('ml-new-litter').checked = false;
+    }
+
+    renderKeptImages();
+    document.getElementById('ml-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.mlCloseModal = function () {
+    document.getElementById('ml-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    editingId = null;
+  };
+
+  // ── Render kept images (with remove buttons) ──
+  function renderKeptImages() {
+    const grid = document.getElementById('ml-img-grid');
+    if (!keptImages.length) { grid.innerHTML = '<span style="font-size:13px;color:#94a3b8;">No images yet.</span>'; return; }
+    grid.innerHTML = keptImages.map((url, i) => `
+      <div class="ml-img-thumb-wrap">
+        <img class="ml-img-thumb" src="${url}" onerror="this.onerror=null;this.src='${FALLBACK}';" />
+        <button class="ml-img-remove" onclick="mlRemoveImage(${i})">✕</button>
+      </div>`).join('');
+  }
+
+  window.mlRemoveImage = function (idx) {
+    keptImages.splice(idx, 1);
+    renderKeptImages();
+  };
+
+  // ── Preview new uploads ──
+  window.mlPreviewNew = function (input) {
+    newFilesList = Array.from(input.files);
+    const prev   = document.getElementById('ml-new-previews');
+    prev.innerHTML = '';
+    newFilesList.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const wrap = document.createElement('div');
+        wrap.className = 'ml-img-thumb-wrap';
+        wrap.innerHTML = `<img class="ml-img-thumb" src="${e.target.result}" />`;
+        prev.appendChild(wrap);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // ── Submit ──
+  window.mlSubmit = async function () {
+    const btn = document.getElementById('ml-submit-btn');
+    hideMessages();
+
+    const name = document.getElementById('ml-name').value.trim();
+    if (!name) { showError('Listing name is required.'); return; }
+
+    btn.textContent = 'Saving…';
+    btn.disabled    = true;
+
+    try {
+      const fd = new FormData();
+      fd.append('name',         name);
+      fd.append('description',  document.getElementById('ml-desc').value.trim());
+      fd.append('gender',       document.getElementById('ml-gender').value);
+      fd.append('pomsky_type',  document.getElementById('ml-type').value.trim());
+      fd.append('markings',     document.getElementById('ml-markings').value.trim());
+      fd.append('price',        document.getElementById('ml-price').value);
+      fd.append('availability', document.getElementById('ml-availability').value);
+      fd.append('state',        document.getElementById('ml-state').value.trim());
+      fd.append('city',         document.getElementById('ml-city').value.trim());
+      fd.append('is_new_litter', document.getElementById('ml-new-litter').checked ? 'true' : 'false');
+      fd.append('existing_images', JSON.stringify(keptImages));
+
+      newFilesList.forEach(f => fd.append('new_images', f));
+
+      let url, method;
+      if (editingId) {
+        url    = `${API}/user/listings/${editingId}`;
+        method = 'PATCH';
+      } else {
+        url    = `${API}/user/listings`;
+        method = 'POST';
+      }
+
+      // POST /user/listings still expects JSON, only PATCH uses multipart
+      let res;
+      if (method === 'POST') {
+        // For new listing: no image upload via this form (use the litter request flow)
+        // We still send as JSON for compatibility
+        const body = {
+          name,
+          description: document.getElementById('ml-desc').value.trim(),
+          gender: document.getElementById('ml-gender').value,
+          pomsky_type: document.getElementById('ml-type').value.trim(),
+          markings: document.getElementById('ml-markings').value.trim(),
+          price: document.getElementById('ml-price').value,
+          availability: document.getElementById('ml-availability').value,
+          state: document.getElementById('ml-state').value.trim(),
+          city: document.getElementById('ml-city').value.trim(),
+          is_new_litter: document.getElementById('ml-new-litter').checked,
+          images: keptImages
+        };
+        res = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+      } else {
+        res = await fetch(url, { method: 'PATCH', credentials: 'include', body: fd });
+      }
+
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Something went wrong.'); return; }
+
+      showSuccess(editingId ? 'Listing updated!' : 'Listing added!');
+      await loadListings();
+      setTimeout(mlCloseModal, 1200);
+
+    } catch (e) {
+      showError('Network error. Please try again.');
+    } finally {
+      btn.textContent = 'Save Listing';
+      btn.disabled    = false;
+    }
+  };
+
+  // ── Delete ──
+  window.mlDelete = async function (id) {
+    if (!confirm('Delete this listing? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`${API}/user/listings/${id}`, {
+        method: 'DELETE', credentials: 'include'
+      });
+      if (res.ok) { await loadListings(); }
+      else { alert('Could not delete listing.'); }
+    } catch { alert('Network error.'); }
+  };
+
+  // ── Helpers ──
+  function showError(msg) {
+    const el = document.getElementById('ml-error');
+    el.textContent = msg; el.style.display = 'block';
+  }
+  function showSuccess(msg) {
+    const el = document.getElementById('ml-success');
+    el.textContent = msg; el.style.display = 'block';
+  }
+  function hideMessages() {
+    document.getElementById('ml-error').style.display   = 'none';
+    document.getElementById('ml-success').style.display = 'none';
+  }
+
+  // Close on overlay click
+  document.getElementById('ml-overlay').addEventListener('click', function(e) {
+    if (e.target === this) mlCloseModal();
+  });
+
+  // ── Init ──
+  loadListings();
+})();
+</script>

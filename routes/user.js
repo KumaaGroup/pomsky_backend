@@ -220,21 +220,53 @@ router.get('/my-listings', authMiddleware, async (req, res) => {
   res.json({ listings: data });
 });
 
-// Update a listing
-router.patch('/listings/:id', authMiddleware, async (req, res) => {
+// Update a listing (supports multipart/form-data for image uploads)
+router.patch('/listings/:id', authMiddleware, upload.array('new_images'), async (req, res) => {
   const {
     name, gender, pomsky_type, markings,
     price, availability, state, city,
-    images, description, is_new_litter
+    description, is_new_litter,
+    existing_images  // JSON string of image URLs to keep
   } = req.body;
+
+  // Upload any new image files to Supabase Storage
+  let uploadedUrls = [];
+  const files = req.files || [];
+  for (const file of files) {
+    const fileName = `listings/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.originalname}`;
+    const { error: uploadError } = await supabase.storage
+      .from('pomsky-images')
+      .upload(fileName, file.buffer, { contentType: file.mimetype });
+    if (!uploadError) {
+      const { data: pub } = supabase.storage.from('pomsky-images').getPublicUrl(fileName);
+      uploadedUrls.push(pub.publicUrl);
+    } else {
+      console.error('LISTING IMAGE UPLOAD ERROR:', uploadError);
+    }
+  }
+
+  // Merge kept existing images + newly uploaded images
+  let keptImages = [];
+  if (existing_images) {
+    try { keptImages = JSON.parse(existing_images); } catch { keptImages = []; }
+  }
+  const finalImages = [...keptImages, ...uploadedUrls];
+
+  const payload = {
+    name, gender, pomsky_type, markings,
+    price: price ? Number(price) : null,
+    availability, state, city,
+    images: finalImages,
+    description,
+    is_new_litter: is_new_litter === 'true' || is_new_litter === true
+  };
+
+  // Strip undefined values so we don't accidentally null out fields
+  Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
 
   const { error } = await supabase
     .from('pomsky_listings')
-    .update({
-      name, gender, pomsky_type, markings,
-      price, availability, state, city,
-      images, description, is_new_litter
-    })
+    .update(payload)
     .eq('id', req.params.id)
     .eq('user_id', req.user.id); // ensure they own it
 
