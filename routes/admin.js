@@ -376,6 +376,7 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
         availability: request.availability || 'available',
         state: request.state || null,
         breeder_id: breeder.id,
+        user_id: request.user_id, // ✅ Add missing user_id so it shows in breeder portal
         is_active: true,
         is_new_litter: true,
         contact_email: request.contact_email || null,
