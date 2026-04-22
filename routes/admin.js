@@ -477,7 +477,15 @@ router.get('/breeder-requests', adminAuth, async (req, res) => {
       breeder_name, business_name, email, phone,
       state, city, country, website, bio,
       profile_image,
-      social_facebook, social_instagram, social_twitter,
+      social_facebook, social_instagram, social_twitter, social_youtube, social_other,
+      apkc_member_status, apkc_proof_url,
+      ipa_member_status, ipa_proof_url,
+      good_dog_member_status, good_dog_proof_url,
+      non_member_action, available_pomskies_info, price_range,
+      what_is_included, vet_reference, health_tests,
+      testimonial_1, testimonial_2, testimonial_3,
+      kennel_logo_url, kennel_photos_urls,
+      disclosure, other_comments, agreed_code_of_ethics,
       user_id
     `)
     .order('created_at', { ascending: false });
