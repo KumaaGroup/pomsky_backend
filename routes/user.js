@@ -287,34 +287,48 @@ router.delete('/listings/:id', authMiddleware, async (req, res) => {
 });
 
 // Complete breeder onboarding
-// Accepts multipart/form-data so the breeder can upload a profile image directly
-router.post('/complete-onboarding', authMiddleware, upload.array('profile_image'), async (req, res) => {
+router.post('/complete-onboarding', authMiddleware, upload.any(), async (req, res) => {
   const {
     breeder_name, business_name,
     state, city, country,
     phone, email,
     website, bio,
-    social_facebook, social_instagram, social_twitter
+    social_facebook, social_instagram, social_twitter, social_youtube, social_other,
+    apkc_member_status, ipa_member_status, good_dog_member_status,
+    non_member_action, available_pomskies_info, price_range,
+    what_is_included, vet_reference, health_tests,
+    testimonial_1, testimonial_2, testimonial_3,
+    disclosure, other_comments, agreed_code_of_ethics
   } = req.body;
 
-  // ── Upload profile images to Supabase Storage ──
-  let profileImageUrls = [];
+  // ── Upload files to Supabase Storage ──
   const files = req.files || [];
+  const uploads = {
+    apkc_proof_url: null,
+    ipa_proof_url: null,
+    good_dog_proof_url: null,
+    kennel_logo_url: null,
+    kennel_photos_urls: []
+  };
+
   for (const file of files) {
-    const fileName = `breeder-profiles/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.originalname}`;
+    const fileName = `onboarding/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.originalname}`;
     const { error: uploadError } = await supabase.storage
       .from('pomsky-images')
       .upload(fileName, file.buffer, { contentType: file.mimetype });
-    if (uploadError) {
-      console.error('PROFILE IMAGE UPLOAD ERROR:', uploadError);
-    } else {
+    
+    if (!uploadError) {
       const { data: pub } = supabase.storage.from('pomsky-images').getPublicUrl(fileName);
-      profileImageUrls.push(pub.publicUrl);
+      
+      // Match the file field name
+      if (file.fieldname === 'apkc_proof') uploads.apkc_proof_url = pub.publicUrl;
+      else if (file.fieldname === 'ipa_proof') uploads.ipa_proof_url = pub.publicUrl;
+      else if (file.fieldname === 'good_dog_proof') uploads.good_dog_proof_url = pub.publicUrl;
+      else if (file.fieldname === 'kennel_logo') uploads.kennel_logo_url = pub.publicUrl;
+      else if (file.fieldname === 'kennel_photos') uploads.kennel_photos_urls.push(pub.publicUrl);
+    } else {
+      console.error('FILE UPLOAD ERROR:', uploadError);
     }
-  }
-  // If no new image uploaded, fall back to any URL(s) sent as plain text field
-  if (profileImageUrls.length === 0 && req.body.profile_image_url) {
-    profileImageUrls = toArray(req.body.profile_image_url);
   }
 
   if (!breeder_name) {
@@ -332,34 +346,7 @@ router.post('/complete-onboarding', authMiddleware, upload.array('profile_image'
     return res.status(500).json({ error: fetchError.message });
   }
 
-  // Save full request data so admin can approve with complete info
-  const { error: requestError } = await supabase
-    .from('breeder_requests')
-    .insert({
-      user_id: req.user.id,
-      breeder_name,
-      business_name,
-      state,
-      city,
-      country: country || 'US',
-      phone,
-      email,
-      website,
-      bio,
-      profile_image: profileImageUrls.length > 0 ? profileImageUrls : null,  // text[]
-      social_facebook:  toArray(social_facebook),   // text[]
-      social_instagram: toArray(social_instagram),  // text[]
-      social_twitter:   toArray(social_twitter),    // text[]
-      status: 'pending'
-    });
-
-  if (requestError) {
-    console.error(requestError);
-    return res.status(400).json({ error: requestError.message });
-  }
-
-  // Also pre-populate the breeder_profile (unapproved) so data is ready on approval
-  const breederProfilePayload = {
+  const payload = {
     breeder_name,
     business_name,
     state,
@@ -369,10 +356,50 @@ router.post('/complete-onboarding', authMiddleware, upload.array('profile_image'
     email,
     website,
     bio,
-    profile_image: profileImageUrls.length > 0 ? profileImageUrls : null,  // text[]
-    social_facebook:  toArray(social_facebook),   // text[]
-    social_instagram: toArray(social_instagram),  // text[]
-    social_twitter:   toArray(social_twitter),    // text[]
+    social_facebook:  toArray(social_facebook),
+    social_instagram: toArray(social_instagram),
+    social_twitter:   toArray(social_twitter),
+    social_youtube:   social_youtube || null,
+    social_other:     social_other || null,
+    apkc_member_status,
+    ipa_member_status,
+    good_dog_member_status,
+    non_member_action,
+    available_pomskies_info,
+    price_range,
+    what_is_included,
+    vet_reference,
+    health_tests,
+    testimonial_1,
+    testimonial_2,
+    testimonial_3,
+    disclosure,
+    other_comments,
+    agreed_code_of_ethics: agreed_code_of_ethics === 'true' || agreed_code_of_ethics === true,
+    apkc_proof_url: uploads.apkc_proof_url,
+    ipa_proof_url: uploads.ipa_proof_url,
+    good_dog_proof_url: uploads.good_dog_proof_url,
+    kennel_logo_url: uploads.kennel_logo_url,
+    kennel_photos_urls: uploads.kennel_photos_urls
+  };
+
+  // Save full request data so admin can review
+  const { error: requestError } = await supabase
+    .from('breeder_requests')
+    .insert({
+      user_id: req.user.id,
+      status: 'pending',
+      ...payload
+    });
+
+  if (requestError) {
+    console.error(requestError);
+    return res.status(400).json({ error: requestError.message });
+  }
+
+  // Pre-populate the breeder_profile (unapproved)
+  const profilePayload = {
+    ...payload,
     is_onboarded: true,
     is_approved: false
   };
@@ -380,25 +407,14 @@ router.post('/complete-onboarding', authMiddleware, upload.array('profile_image'
   if (breederProfile) {
     const { error: updateError } = await supabase
       .from('breeder_profiles')
-      .update(breederProfilePayload)
+      .update(profilePayload)
       .eq('user_id', req.user.id);
-
-    if (updateError) {
-      console.error(updateError);
-      return res.status(500).json({ error: updateError.message });
-    }
+    if (updateError) return res.status(500).json({ error: updateError.message });
   } else {
     const { error: insertError } = await supabase
       .from('breeder_profiles')
-      .insert({
-        user_id: req.user.id,
-        ...breederProfilePayload
-      });
-
-    if (insertError) {
-      console.error(insertError);
-      return res.status(500).json({ error: insertError.message });
-    }
+      .insert({ user_id: req.user.id, ...profilePayload });
+    if (insertError) return res.status(500).json({ error: insertError.message });
   }
 
   const { error: profileError } = await supabase
@@ -406,10 +422,7 @@ router.post('/complete-onboarding', authMiddleware, upload.array('profile_image'
     .update({ needs_onboarding: false })
     .eq('id', req.user.id);
 
-  if (profileError) {
-    console.error(profileError);
-    return res.status(500).json({ error: profileError.message });
-  }
+  if (profileError) return res.status(500).json({ error: profileError.message });
 
   res.json({ message: 'Request submitted for approval' });
 });

@@ -60,7 +60,7 @@ router.get('/', async (req, res) => {
 
 router.post('/schedule-litter', upload.array('photos'), async (req, res) => {
   try {
-    const token = req.cookies.token;
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
     const { data: userData } = await supabase.auth.getUser(token);
@@ -161,7 +161,7 @@ console.error("STACK:", err.stack);
 });
 
 router.get('/my-requests', async (req, res) => {
-  const token = req.cookies.token;
+  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
   const { data: userData } = await supabase.auth.getUser(token);

@@ -4,12 +4,13 @@ const supabase = require('../supabase');
 
 // REGISTER
 router.post('/register', async (req, res) => {
-  const { email, password, name, account_type } = req.body;
+  const { email, password, name, account_type, redirect_to } = req.body;
 
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: { 
+      emailRedirectTo: redirect_to ? `${process.env.FRONTEND_URL}${redirect_to}` : `${process.env.FRONTEND_URL}/login`,
       data: { 
         name,
         account_type: account_type || 'shopper',
@@ -27,7 +28,7 @@ router.post('/register', async (req, res) => {
 
 // LOGIN
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, redirect_to } = req.body;
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -49,7 +50,7 @@ router.post('/login', async (req, res) => {
     message: 'Logged in!',
     user: data.user,
     access_token: accessToken,
-    redirect: '/dashboard'
+    redirect: redirect_to ? redirect_to : '/dashboard'
   });
 });
 

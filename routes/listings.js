@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
     }
 
     let isPaidMember = false;
-    const token = req.cookies.token;
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
 
     if (token) {
       const { data: userData } = await supabase.auth.getUser(token);
@@ -131,7 +131,7 @@ router.get('/:id', async (req, res) => {
 console.log("LENGTH:", req.params.id.length);
 console.log("CHARS:", [...req.params.id]);
 
-    const token = req.cookies.token;
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     let isPaidMember = false;
 
     if (token) {
