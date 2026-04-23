@@ -174,6 +174,40 @@ router.get('/my-requests', async (req, res) => {
   res.json({ requests: data || [] });
 });
 
+router.get('/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    // Fetch breeder profile
+    const { data: profile, error: profileError } = await supabase
+      .from('breeder_profiles')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (profileError) throw profileError;
+    if (!profile) return res.status(404).json({ error: 'Breeder not found' });
+
+    // Fetch breeder's listings
+    const { data: listings, error: listingsError } = await supabase
+      .from('pomsky_listings')
+      .select('*')
+      .eq('breeder_id', id)
+      .eq('is_active', true);
+
+    if (listingsError) throw listingsError;
+
+    res.json({
+      profile,
+      listings: listings || []
+    });
+
+  } catch (err) {
+    console.error("SINGLE BREEDER FETCH ERROR:", err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.get('/meta/states', async (req, res) => {
   try {
     const { data, error } = await supabase
