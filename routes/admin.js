@@ -109,11 +109,26 @@ router.get('/users', adminAuth, async (req, res) => {
 });
 
 router.patch('/users/:id/membership', adminAuth, async (req, res) => {
-  const { membership_type, membership_status } = req.body;
+  const { 
+    membership_shopper, status_shopper,
+    membership_breeder, status_breeder,
+    membership_owner, status_owner,
+    membership_type, membership_status 
+  } = req.body;
+
+  const updateData = {
+    membership_shopper, status_shopper,
+    membership_breeder, status_breeder,
+    membership_owner, status_owner,
+    membership_type, membership_status
+  };
+
+  // Remove undefined fields
+  Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
   const { error } = await supabase
     .from('profiles')
-    .update({ membership_type, membership_status })
+    .update(updateData)
     .eq('id', req.params.id);
 
   if (error) return res.status(400).json({ error: error.message });
@@ -179,7 +194,7 @@ router.delete('/store-items/:id', adminAuth, async (req, res) => {
 
 router.get('/stats', adminAuth, async (req, res) => {
   const [usersResult, storeResult, ordersResult, listingsResult] = await Promise.all([
-    supabase.from('profiles').select('membership_type'),
+    supabase.from('profiles').select('membership_type, membership_shopper, membership_breeder, membership_owner'),
     supabase.from('store_items').select('id, is_active'),
     supabase.from('orders').select('total, status'),
     supabase.from('pomsky_listings').select('id, is_active')
@@ -187,7 +202,24 @@ router.get('/stats', adminAuth, async (req, res) => {
 
   const users = usersResult.data || [];
   const membershipCounts = users.reduce((acc, u) => {
-    acc[u.membership_type] = (acc[u.membership_type] || 0) + 1;
+    // Count Shoppers
+    if (u.membership_shopper && u.membership_shopper !== 'shopper_free') {
+      acc[u.membership_shopper] = (acc[u.membership_shopper] || 0) + 1;
+    }
+    // Count Breeders
+    if (u.membership_breeder && u.membership_breeder !== 'breeder_free') {
+      acc[u.membership_breeder] = (acc[u.membership_breeder] || 0) + 1;
+    }
+    // Count Owners
+    if (u.membership_owner && u.membership_owner !== 'owner_free') {
+      acc[u.membership_owner] = (acc[u.membership_owner] || 0) + 1;
+    }
+    
+    // Add legacy if none of the above are present or for transition
+    if (u.membership_type && !u.membership_shopper && !u.membership_breeder && !u.membership_owner) {
+      acc[u.membership_type] = (acc[u.membership_type] || 0) + 1;
+    }
+    
     return acc;
   }, {});
 

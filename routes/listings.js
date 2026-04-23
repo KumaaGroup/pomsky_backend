@@ -76,17 +76,21 @@ router.get('/', async (req, res) => {
       if (userData?.user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('membership_type')
+          .select('membership_type, membership_shopper, membership_breeder, membership_owner')
           .eq('id', userData.user.id)
           .maybeSingle();
 
         const paidTypes = [
           'shopper_monthly', 'shopper_lifetime',
           'owner_monthly', 'owner_annual',
-          'breeder_free', 'breeder_silver', 'breeder_gold'
+          'breeder_silver', 'breeder_gold'
         ];
 
-        isPaidMember = paidTypes.includes(profile?.membership_type);
+        isPaidMember = 
+          paidTypes.includes(profile?.membership_shopper) ||
+          paidTypes.includes(profile?.membership_breeder) ||
+          paidTypes.includes(profile?.membership_owner) ||
+          paidTypes.includes(profile?.membership_type);
       }
     }
 
@@ -124,12 +128,7 @@ router.get('/', async (req, res) => {
 ================================ */
 router.get('/:id', async (req, res) => {
   try {
-    const id = req.params.id.trim(); // 🔥 important fix
-
-    console.log("FETCHING LISTING ID:", id);
-    console.log("RAW PARAM:", req.params.id);
-console.log("LENGTH:", req.params.id.length);
-console.log("CHARS:", [...req.params.id]);
+    const id = req.params.id.trim(); 
 
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     let isPaidMember = false;
@@ -139,17 +138,21 @@ console.log("CHARS:", [...req.params.id]);
       if (userData?.user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('membership_type')
+          .select('membership_type, membership_shopper, membership_breeder, membership_owner')
           .eq('id', userData.user.id)
           .maybeSingle();
 
         const paidTypes = [
           'shopper_monthly', 'shopper_lifetime',
           'owner_monthly', 'owner_annual',
-          'breeder_free', 'breeder_silver', 'breeder_gold'
+          'breeder_silver', 'breeder_gold'
         ];
 
-        isPaidMember = paidTypes.includes(profile?.membership_type);
+        isPaidMember = 
+          paidTypes.includes(profile?.membership_shopper) ||
+          paidTypes.includes(profile?.membership_breeder) ||
+          paidTypes.includes(profile?.membership_owner) ||
+          paidTypes.includes(profile?.membership_type);
       }
     }
 
@@ -158,7 +161,7 @@ console.log("CHARS:", [...req.params.id]);
       .select(`
         id, name, gender, pomsky_type, markings, price,
         availability, state, city, images,
-       contact_email, contact_phone,
+        contact_email, contact_phone,
         description, birth_date, is_new_litter, created_at,
         breeder_profiles (
           breeder_name, business_name, state, city, phone, website
@@ -166,10 +169,7 @@ console.log("CHARS:", [...req.params.id]);
       `)
       .eq('id', id)
       .eq('is_active', true)
-      .maybeSingle(); // 🔥 safer than single()
-
-    console.log("DB RESULT:", data);
-    console.log("DB ERROR:", error);
+      .maybeSingle();
 
     if (!data) {
       return res.status(404).json({ error: 'Listing not found' });

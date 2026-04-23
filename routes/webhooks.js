@@ -28,173 +28,190 @@ router.post(
 
         // ── Payment successful ──
         case 'checkout.session.completed': {
-  const session = event.data.object;
-  const { user_id, membership_type } = session.metadata;
+          const session = event.data.object;
+          const { user_id, membership_type } = session.metadata;
 
-  // 🔥 ADD THIS
-  const isPaidBreeder =
-    membership_type === 'breeder_silver' ||
-    membership_type === 'breeder_gold';
+          const isBreeder = membership_type === 'breeder_silver' || membership_type === 'breeder_gold';
+          const isOwner   = membership_type === 'owner_monthly' || membership_type === 'owner_annual';
+          const isShopper = membership_type === 'shopper_monthly' || membership_type === 'shopper_lifetime';
 
-  const { data: existingBreeder } = await supabase
-    .from('breeder_profiles')
-    .select('id')
-    .eq('user_id', user_id)
-    .single();
+          let category = 'shopper';
+          if (isBreeder) category = 'breeder';
+          if (isOwner)   category = 'owner';
 
-  const needsOnboarding = isPaidBreeder && !existingBreeder;
+          const { data: existingBreeder } = await supabase
+            .from('breeder_profiles')
+            .select('id')
+            .eq('user_id', user_id)
+            .single();
 
-  // Get current membership before upgrading
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('membership_type, membership_status, stripe_subscription_id')
-    .eq('id', user_id)
-    .single();
+          const needsOnboarding = isBreeder && !existingBreeder;
 
-  if (currentProfile?.membership_type) {
-    await supabase
-      .from('membership_history')
-      .insert({
-        user_id,
-        membership_type: currentProfile.membership_type,
-        membership_status: 'replaced',
-        ended_at: new Date().toISOString(),
-        stripe_subscription_id: currentProfile.stripe_subscription_id
-      });
-  }
+          // Update the category-specific fields
+          const updateData = {
+            [`membership_${category}`]: membership_type,
+            [`status_${category}`]: 'active',
+            [`sub_id_${category}`]: session.subscription || null,
+            stripe_customer_id: session.customer,
+            // Keep legacy fields for backward compatibility during transition
+            membership_type,
+            membership_status: 'active',
+            stripe_subscription_id: session.subscription || null,
+            needs_onboarding: needsOnboarding
+          };
 
-  await supabase
-    .from('membership_history')
-    .insert({
-      user_id,
-      membership_type,
-      membership_status: 'active',
-      started_at: new Date().toISOString(),
-      stripe_subscription_id: session.subscription || null
-    });
+          await supabase
+            .from('profiles')
+            .update(updateData)
+            .eq('id', user_id);
 
-  await supabase
-    .from('profiles')
-    .update({
-      membership_type,
-      membership_status: 'active',
-      account_type: isPaidBreeder ? 'breeder' : currentProfile.account_type,
-      stripe_customer_id: session.customer,
-      stripe_subscription_id: session.subscription || null,
-      needs_onboarding: needsOnboarding // ✅ FIXED
-    })
-    .eq('id', user_id)
+          // Log to history
+          await supabase
+            .from('membership_history')
+            .insert({
+              user_id,
+              membership_type,
+              membership_status: 'active',
+              started_at: new Date().toISOString(),
+              stripe_subscription_id: session.subscription || null
+            });
 
+          // Handle Breeder Profile
+          if (isBreeder) {
+            if (existingBreeder) {
+              await supabase
+                .from('breeder_profiles')
+                .update({ is_featured: membership_type === 'breeder_gold' })
+                .eq('user_id', user_id);
+            } else {
+              await supabase
+                .from('breeder_profiles')
+                .insert({
+                  user_id: user_id,
+                  breeder_name: 'New Breeder',
+                  business_name: 'Pending Setup',
+                  is_featured: membership_type === 'breeder_gold',
+                  is_approved: false
+                });
+            }
+          }
 
-    // 🔥 HANDLE BREEDER PROFILE
-if (isPaidBreeder) {
-  const { data: breeder } = await supabase
-    .from('breeder_profiles')
-    .select('id')
-    .eq('user_id', user_id)
-    .single();
-
-  if (breeder) {
-    // 👉 Update existing breeder
-    await supabase
-      .from('breeder_profiles')
-      .update({
-        is_featured: membership_type === 'breeder_gold'
-      })
-      .eq('user_id', user_id);
-
-  } else {
-    // 👉 Create breeder profile if missing
-    await supabase
-      .from('breeder_profiles')
-      .insert({
-        user_id: user_id,
-        breeder_name: 'New Breeder',
-        business_name: 'Pending Setup',
-        is_featured: membership_type === 'breeder_gold',
-        is_approved: false
-      });
-  }
-}
-
-  break;
-}
+          break;
+        }
 
         // ── Subscription renewed ──
         case 'invoice.payment_succeeded': {
           const invoice = event.data.object;
+          const subId = invoice.subscription;
 
-          await supabase
+          // Find which category this subscription belongs to
+          const { data: profile } = await supabase
             .from('profiles')
-            .update({ membership_status: 'active' })
-            .eq('stripe_customer_id', invoice.customer);
+            .select('id, sub_id_shopper, sub_id_breeder, sub_id_owner')
+            .eq('stripe_customer_id', invoice.customer)
+            .single();
 
-          console.log('Subscription renewed for customer:', invoice.customer);
+          if (profile) {
+            let field = 'membership_status'; // default
+            if (profile.sub_id_shopper === subId) field = 'status_shopper';
+            if (profile.sub_id_breeder === subId) field = 'status_breeder';
+            if (profile.sub_id_owner === subId)   field = 'status_owner';
+
+            await supabase
+              .from('profiles')
+              .update({ [field]: 'active', membership_status: 'active' })
+              .eq('id', profile.id);
+          }
           break;
         }
 
         // ── Payment failed ──
         case 'invoice.payment_failed': {
           const invoice = event.data.object;
+          const subId = invoice.subscription;
 
-          await supabase
+          const { data: profile } = await supabase
             .from('profiles')
-            .update({ membership_status: 'past_due' })
-            .eq('stripe_customer_id', invoice.customer);
+            .select('id, sub_id_shopper, sub_id_breeder, sub_id_owner')
+            .eq('stripe_customer_id', invoice.customer)
+            .single();
 
-          console.log('Payment failed for customer:', invoice.customer);
+          if (profile) {
+            let field = 'membership_status';
+            if (profile.sub_id_shopper === subId) field = 'status_shopper';
+            if (profile.sub_id_breeder === subId) field = 'status_breeder';
+            if (profile.sub_id_owner === subId)   field = 'status_owner';
+
+            await supabase
+              .from('profiles')
+              .update({ [field]: 'past_due', membership_status: 'past_due' })
+              .eq('id', profile.id);
+          }
           break;
         }
 
         // ── Subscription cancelled ──
         case 'customer.subscription.deleted': {
           const subscription = event.data.object;
+          const subId = subscription.id;
 
           const { data: profile } = await supabase
             .from('profiles')
-            .select('id, account_type, membership_type')
+            .select('id, sub_id_shopper, sub_id_breeder, sub_id_owner, membership_type')
             .eq('stripe_customer_id', subscription.customer)
             .single();
 
-          const freeTiers = {
-            shopper: 'shopper_free',
-            owner:   'owner_free',
-            breeder: 'breeder_free'
-          };
+          if (profile) {
+            let category = 'shopper';
+            if (profile.sub_id_shopper === subId) category = 'shopper';
+            if (profile.sub_id_breeder === subId) category = 'breeder';
+            if (profile.sub_id_owner === subId)   category = 'owner';
 
-          const freeTier = freeTiers[profile?.account_type] || 'shopper_free';
+            const freeTier = `${category}_free`;
 
-          await supabase
-            .from('profiles')
-            .update({
-              membership_type: freeTier,
-              membership_status: 'cancelled',
-              stripe_subscription_id: null
-            })
-            .eq('stripe_customer_id', subscription.customer);
-
-          // If they were gold, remove featured status from their breeder profile
-          if (profile?.membership_type === 'breeder_gold' && profile?.id) {
             await supabase
-              .from('breeder_profiles')
-              .update({ is_featured: false })
-              .eq('user_id', profile.id);
-            console.log('Gold breeder downgraded — removed featured status');
-          }
+              .from('profiles')
+              .update({
+                [`membership_${category}`]: freeTier,
+                [`status_${category}`]: 'cancelled',
+                [`sub_id_${category}`]: null,
+                // Legacy fields
+                membership_type: freeTier,
+                membership_status: 'cancelled'
+              })
+              .eq('id', profile.id);
 
-          console.log('Subscription cancelled, downgraded to:', freeTier);
+            if (category === 'breeder' && profile.membership_type === 'breeder_gold') {
+              await supabase
+                .from('breeder_profiles')
+                .update({ is_featured: false })
+                .eq('user_id', profile.id);
+            }
+          }
           break;
         }
 
         // ── Subscription cancelling at period end ──
         case 'customer.subscription.updated': {
           const subscription = event.data.object;
-
           if (subscription.cancel_at_period_end) {
-            await supabase
+            const { data: profile } = await supabase
               .from('profiles')
-              .update({ membership_status: 'cancelling' })
-              .eq('stripe_customer_id', subscription.customer);
+              .select('id, sub_id_shopper, sub_id_breeder, sub_id_owner')
+              .eq('stripe_customer_id', subscription.customer)
+              .single();
+
+            if (profile) {
+              let field = 'membership_status';
+              if (profile.sub_id_shopper === subscription.id) field = 'status_shopper';
+              if (profile.sub_id_breeder === subscription.id) field = 'status_breeder';
+              if (profile.sub_id_owner === subscription.id)   field = 'status_owner';
+
+              await supabase
+                .from('profiles')
+                .update({ [field]: 'cancelling', membership_status: 'cancelling' })
+                .eq('id', profile.id);
+            }
           }
           break;
         }

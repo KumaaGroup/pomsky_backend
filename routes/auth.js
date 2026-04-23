@@ -90,7 +90,7 @@ router.get('/me', async (req, res) => {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('membership_type')
+      .select('membership_type, membership_shopper, membership_breeder, membership_owner')
       .eq('id', userId)
       .maybeSingle();
 
