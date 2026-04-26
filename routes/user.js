@@ -298,14 +298,21 @@ router.post('/breeder-profile', authMiddleware, async (req, res) => {
   const payload = {
     breeder_name, business_name, state, city, country: country || 'US',
     phone, email, website, bio, profile_image,
-    social_facebook, social_instagram, social_twitter, social_youtube,
+    // These columns are text[] in Postgres — must use toArray(), empty string "" is invalid
+    social_facebook:  toArray(social_facebook  || null),
+    social_instagram: toArray(social_instagram || null),
+    social_twitter:   toArray(social_twitter   || null),
+    social_youtube:   toArray(social_youtube   || null),
     available_pomskies_info, price_range, what_is_included,
     health_tests, vet_reference,
     testimonial_1, testimonial_2, testimonial_3
   };
 
-  // Strip undefined so we don't overwrite existing fields with null
-  Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+  // Strip undefined and empty strings so we don't corrupt existing data
+  Object.keys(payload).forEach(k => {
+    if (payload[k] === undefined) delete payload[k];
+    if (payload[k] === '') payload[k] = null; // treat empty string as null for text fields
+  });
 
   let result;
   if (existing) {
