@@ -90,7 +90,7 @@ router.get('/me', async (req, res) => {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('membership_type, membership_shopper, membership_breeder, membership_owner')
+      .select('membership_type, membership_shopper, membership_breeder, membership_owner, status_shopper, status_breeder, status_owner, account_type')
       .eq('id', userId)
       .maybeSingle();
 
@@ -102,8 +102,18 @@ router.get('/me', async (req, res) => {
 
     res.json({
       user: data.user,
+      // Legacy
       membership_type: profile?.membership_type || null,
-      is_onboarded: breeder?.is_onboarded || false
+      is_onboarded: breeder?.is_onboarded || false,
+      account_type: profile?.account_type || 'shopper',
+      // Multi-role memberships
+      membership_shopper: profile?.membership_shopper || 'shopper_free',
+      membership_breeder: profile?.membership_breeder || 'breeder_free',
+      membership_owner:   profile?.membership_owner   || 'owner_free',
+      // Statuses (active / paused / cancelling)
+      status_shopper: profile?.status_shopper || 'active',
+      status_breeder: profile?.status_breeder || 'active',
+      status_owner:   profile?.status_owner   || 'active',
     });
 
   } catch (err) {
