@@ -44,13 +44,13 @@ router.get('/', async (req, res) => {
   availability, state, city, country,
   images, description,
   contact_email, contact_phone,
-  is_featured, created_at,
+  is_featured, is_new_litter, created_at,
   breeder_profiles (
-    id, breeder_name, business_name, state, city
+    id, breeder_name, business_name, state, city,
+    user_id
   )
 `)
       .eq('is_active', true)
-      .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (state) query = query.eq('state', state);
@@ -67,6 +67,14 @@ router.get('/', async (req, res) => {
       console.error("LISTINGS ERROR:", error);
       return res.status(400).json({ error: error.message });
     }
+
+    // ── Fetch gold breeder user IDs so we can auto-feature their listings ──
+    const { data: goldBreeders } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('membership_breeder', 'breeder_gold');
+
+    const goldUserIds = new Set((goldBreeders || []).map(p => p.id));
 
     let isPaidMember = false;
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
@@ -86,7 +94,7 @@ router.get('/', async (req, res) => {
           'breeder_silver', 'breeder_gold'
         ];
 
-        isPaidMember = 
+        isPaidMember =
           paidTypes.includes(profile?.membership_shopper) ||
           paidTypes.includes(profile?.membership_breeder) ||
           paidTypes.includes(profile?.membership_owner) ||
@@ -95,7 +103,19 @@ router.get('/', async (req, res) => {
     }
 
     const FREE_LIMIT = 6;
-    let listings = data || [];
+
+    // ── Auto-set is_featured for gold breeder listings, sort featured first ──
+    let listings = (data || []).map(l => ({
+      ...l,
+      is_featured: l.is_featured || goldUserIds.has(l.breeder_profiles?.user_id)
+    }));
+
+    // Sort: featured first, then by newest
+    listings.sort((a, b) => {
+      if (a.is_featured && !b.is_featured) return -1;
+      if (!a.is_featured && b.is_featured) return 1;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
 
     if (!isPaidMember) {
       const visible = listings.slice(0, FREE_LIMIT);
@@ -126,6 +146,7 @@ router.get('/', async (req, res) => {
 /* ================================
    🔹 GET SINGLE LISTING (LAST!)
 ================================ */
+
 router.get('/:id', async (req, res) => {
   try {
     const id = req.params.id.trim(); 
