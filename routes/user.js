@@ -5,6 +5,168 @@ const upload = multer();
 const supabase = require('../supabase');
 const authMiddleware = require('../middleware/auth');
 
+// ── Membership Management Helpers ──
+
+/**
+ * Determine which profile columns to update based on membership_type prefix.
+ * e.g. 'shopper_monthly' → { statusCol: 'status_shopper', subIdCol: 'sub_id_shopper' }
+ */
+function getMembershipCols(membership_type) {
+  if (!membership_type) return null;
+  if (membership_type.startsWith('shopper_')) return { statusCol: 'status_shopper', subIdCol: 'sub_id_shopper' };
+  if (membership_type.startsWith('breeder_')) return { statusCol: 'status_breeder', subIdCol: 'sub_id_breeder' };
+  if (membership_type.startsWith('owner_'))   return { statusCol: 'status_owner',   subIdCol: 'sub_id_owner' };
+  return null;
+}
+
+// Pause membership
+router.post('/membership/pause', authMiddleware, async (req, res) => {
+  const { membership_type } = req.body;
+  const cols = getMembershipCols(membership_type);
+  if (!cols) return res.status(400).json({ error: 'Invalid membership type' });
+
+  // Fetch current subscription ID (for Stripe)
+  const { data: profile, error: fetchErr } = await supabase
+    .from('profiles')
+    .select(`${cols.subIdCol}`)
+    .eq('id', req.user.id)
+    .single();
+
+  if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+
+  // Update status in DB
+  const { error } = await supabase
+    .from('profiles')
+    .update({ [cols.statusCol]: 'paused' })
+    .eq('id', req.user.id);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Optionally pause Stripe subscription if sub ID exists
+  const subId = profile[cols.subIdCol];
+  if (subId && process.env.STRIPE_SECRET_KEY) {
+    try {
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      await stripe.subscriptions.update(subId, {
+        pause_collection: { behavior: 'void' }
+      });
+    } catch (stripeErr) {
+      console.warn('Stripe pause warning (status updated in DB):', stripeErr.message);
+    }
+  }
+
+  res.json({ message: 'Membership paused successfully' });
+});
+
+// Cancel membership
+router.post('/membership/cancel', authMiddleware, async (req, res) => {
+  const { membership_type } = req.body;
+  const cols = getMembershipCols(membership_type);
+  if (!cols) return res.status(400).json({ error: 'Invalid membership type' });
+
+  // Fetch current subscription ID (for Stripe)
+  const { data: profile, error: fetchErr } = await supabase
+    .from('profiles')
+    .select(`${cols.subIdCol}`)
+    .eq('id', req.user.id)
+    .single();
+
+  if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+
+  // Update status to 'cancelling' (keeps access until end of billing period)
+  const { error } = await supabase
+    .from('profiles')
+    .update({ [cols.statusCol]: 'cancelling' })
+    .eq('id', req.user.id);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Cancel at period end in Stripe if sub ID exists
+  const subId = profile[cols.subIdCol];
+  if (subId && process.env.STRIPE_SECRET_KEY) {
+    try {
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      await stripe.subscriptions.update(subId, { cancel_at_period_end: true });
+    } catch (stripeErr) {
+      console.warn('Stripe cancel warning (status updated in DB):', stripeErr.message);
+    }
+  }
+
+  res.json({ message: 'Membership cancellation scheduled' });
+});
+
+// Resume membership (from paused)
+router.post('/membership/resume', authMiddleware, async (req, res) => {
+  const { membership_type } = req.body;
+  const cols = getMembershipCols(membership_type);
+  if (!cols) return res.status(400).json({ error: 'Invalid membership type' });
+
+  // Fetch current subscription ID (for Stripe)
+  const { data: profile, error: fetchErr } = await supabase
+    .from('profiles')
+    .select(`${cols.subIdCol}`)
+    .eq('id', req.user.id)
+    .single();
+
+  if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ [cols.statusCol]: 'active' })
+    .eq('id', req.user.id);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Resume Stripe subscription if sub ID exists
+  const subId = profile[cols.subIdCol];
+  if (subId && process.env.STRIPE_SECRET_KEY) {
+    try {
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      await stripe.subscriptions.update(subId, { pause_collection: '' });
+    } catch (stripeErr) {
+      console.warn('Stripe resume warning (status updated in DB):', stripeErr.message);
+    }
+  }
+
+  res.json({ message: 'Membership resumed successfully' });
+});
+
+// Reactivate membership (from cancelling state)
+router.post('/membership/reactivate', authMiddleware, async (req, res) => {
+  const { membership_type } = req.body;
+  const cols = getMembershipCols(membership_type);
+  if (!cols) return res.status(400).json({ error: 'Invalid membership type' });
+
+  // Fetch current subscription ID (for Stripe)
+  const { data: profile, error: fetchErr } = await supabase
+    .from('profiles')
+    .select(`${cols.subIdCol}`)
+    .eq('id', req.user.id)
+    .single();
+
+  if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ [cols.statusCol]: 'active' })
+    .eq('id', req.user.id);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Re-enable Stripe subscription (undo cancel_at_period_end) if sub ID exists
+  const subId = profile[cols.subIdCol];
+  if (subId && process.env.STRIPE_SECRET_KEY) {
+    try {
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      await stripe.subscriptions.update(subId, { cancel_at_period_end: false });
+    } catch (stripeErr) {
+      console.warn('Stripe reactivate warning (status updated in DB):', stripeErr.message);
+    }
+  }
+
+  res.json({ message: 'Membership reactivated successfully' });
+});
+
 // Helper: wrap a value in an array if it isn't already one
 // Social links & images come from multipart forms as strings, DB expects text[]
 const toArray = (v) => {
