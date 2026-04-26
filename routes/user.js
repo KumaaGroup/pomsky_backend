@@ -281,7 +281,10 @@ router.post('/breeder-profile', authMiddleware, async (req, res) => {
   const {
     breeder_name, business_name, state, city, country, phone, email,
     website, bio, profile_image,
-    social_facebook, social_instagram, social_twitter
+    social_facebook, social_instagram, social_twitter, social_youtube,
+    available_pomskies_info, price_range, what_is_included,
+    health_tests, vet_reference,
+    testimonial_1, testimonial_2, testimonial_3
   } = req.body;
 
   if (!breeder_name) return res.status(400).json({ error: 'Breeder name is required' });
@@ -295,8 +298,14 @@ router.post('/breeder-profile', authMiddleware, async (req, res) => {
   const payload = {
     breeder_name, business_name, state, city, country: country || 'US',
     phone, email, website, bio, profile_image,
-    social_facebook, social_instagram, social_twitter
+    social_facebook, social_instagram, social_twitter, social_youtube,
+    available_pomskies_info, price_range, what_is_included,
+    health_tests, vet_reference,
+    testimonial_1, testimonial_2, testimonial_3
   };
+
+  // Strip undefined so we don't overwrite existing fields with null
+  Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
 
   let result;
   if (existing) {
@@ -314,7 +323,10 @@ router.post('/breeder-profile', authMiddleware, async (req, res) => {
       .single();
   }
 
-  if (result.error) return res.status(400).json({ error: result.error.message });
+  if (result.error) {
+    console.error('BREEDER PROFILE SAVE ERROR:', result.error);
+    return res.status(400).json({ error: result.error.message });
+  }
   res.json({ message: 'Breeder profile saved!', profile: result.data });
 });
 
@@ -326,8 +338,12 @@ router.get('/breeder-profile', authMiddleware, async (req, res) => {
     .eq('user_id', req.user.id)
     .maybeSingle();
 
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ profile: data });
+  if (error) {
+    console.error('BREEDER PROFILE FETCH ERROR:', error);
+    return res.status(400).json({ error: error.message });
+  }
+  // data is null if no profile exists yet — return empty profile gracefully
+  res.json({ profile: data || null });
 });
 
 // ── Pomsky Listings ──
