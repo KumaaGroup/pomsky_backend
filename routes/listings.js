@@ -144,6 +144,40 @@ router.get('/', async (req, res) => {
 });
 
 /* ================================
+   🔹 GET LATEST LISTINGS
+================================ */
+router.get('/latest', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 4;
+
+    const { data, error } = await supabase
+      .from('pomsky_listings')
+      .select(`
+        id, name, gender, pomsky_type, price,
+        availability, state, city, images,
+        is_featured, is_new_litter, created_at,
+        breeder_profiles (
+          id, breeder_name, business_name, state, city
+        )
+      `)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error("LATEST LISTINGS ERROR:", error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json({ listings: data || [] });
+
+  } catch (err) {
+    console.error("LATEST LISTINGS CATCH ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/* ================================
    🔹 GET SINGLE LISTING (LAST!)
 ================================ */
 
