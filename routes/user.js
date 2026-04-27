@@ -4,6 +4,7 @@ const multer = require('multer');
 const upload = multer();
 const supabase = require('../supabase');
 const authMiddleware = require('../middleware/auth');
+const { sendEmail } = require('../utils/email');
 
 // ── Membership Management Helpers ──
 
@@ -390,6 +391,21 @@ router.post('/listings', authMiddleware, async (req, res) => {
     .single();
 
   if (error) return res.status(400).json({ error: error.message });
+
+  // Notify Admin
+  sendEmail({
+    to: process.env.GMAIL_USER,
+    subject: `🐾 New Litter Listing: ${name}`,
+    html: `
+      <h2>New Litter Listing Submitted</h2>
+      <p><strong>Breeder:</strong> ${req.user.email}</p>
+      <p><strong>Litter Name:</strong> ${name}</p>
+      <p><strong>Type:</strong> ${pomsky_type}</p>
+      <p><strong>Price:</strong> $${price}</p>
+      <p><a href="${process.env.FRONTEND_URL}/admin">Review in Admin Panel</a></p>
+    `
+  });
+
   res.json({ message: 'Listing added!', listing: data });
 });
 
@@ -608,6 +624,20 @@ router.post('/complete-onboarding', authMiddleware, upload.any(), async (req, re
     .eq('id', req.user.id);
 
   if (profileError) return res.status(500).json({ error: profileError.message });
+
+  // Notify Admin
+  sendEmail({
+    to: process.env.GMAIL_USER,
+    subject: `📢 New Breeder Onboarding: ${business_name || breeder_name}`,
+    html: `
+      <h2>New Breeder Application</h2>
+      <p><strong>Business:</strong> ${business_name || 'N/A'}</p>
+      <p><strong>Breeder Name:</strong> ${breeder_name}</p>
+      <p><strong>Location:</strong> ${city}, ${state}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><a href="${process.env.FRONTEND_URL}/admin">Review in Admin Panel</a></p>
+    `
+  });
 
   res.json({ message: 'Request submitted for approval' });
 });

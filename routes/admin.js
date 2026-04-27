@@ -3,29 +3,8 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const supabase = require('../supabase');
-const nodemailer = require('nodemailer');
+const { sendEmail } = require('../utils/email');
 
-// ── Email transporter (Gmail SMTP) ──
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS   // App Password, NOT your real Gmail password
-  }
-});
-async function sendEmail({ to, subject, html }) {
-  try {
-    await transporter.sendMail({
-      from: `"Pomsky Association" <${process.env.GMAIL_USER}>`,
-      to,
-      subject,
-      html
-    });
-    console.log(`Email sent to ${to}`);
-  } catch (err) {
-    console.error('EMAIL ERROR:', err.message);
-  }
-}
 
 // Admin auth middleware
 const adminAuth = async (req, res, next) => {
