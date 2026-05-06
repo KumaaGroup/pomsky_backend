@@ -6,12 +6,12 @@ const authMiddleware = require('../middleware/auth');
 
 // ── Replace with your actual Stripe Price IDs ──
 const PRICE_IDS = {
-  shopper_monthly:  'price_1TM03FQX4ubgjBMW3GI2wasi',  // $2.99/mo
-  shopper_lifetime: 'price_1TM04rQX4ubgjBMWZfcnJf3z',  // $14.99 one-time
-  owner_monthly:    'price_1TM08cQX4ubgjBMWA0z5evBF',  // $20/mo
-  owner_annual:     'price_1TM09BQX4ubgjBMWM261z1os',  // $200/yr
-  breeder_silver:   'price_1TM09qQX4ubgjBMWuHVuAn3n',  // $20/mo
-  breeder_gold:     'price_1TM0AUQX4ubgjBMWGjeViqsy',  // $40/mo
+  shopper_monthly:  'price_1TTg5ZK3L8j1xMbVQXVNeKzU',  // $2.99/mo
+  shopper_lifetime: 'price_1TTg69K3L8j1xMbVjhwVuCCU',  // $14.99 one-time
+  owner_monthly:    'price_1TTg3dK3L8j1xMbVWtJPOSed',  // $20/mo
+  owner_annual:     'price_1TTg4CK3L8j1xMbVUque7W05',  // $200/yr
+  breeder_silver:   'price_1TTfrxK3L8j1xMbV47pca8la',  // $20/mo
+  breeder_gold:     'price_1TTfraK3L8j1xMbVb0vXPwqu',  // $40/mo
 };
 
 const ONE_TIME_PLANS = ['shopper_lifetime'];
