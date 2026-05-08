@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const supabase = require('../supabase');
 const { sendEmail } = require('../utils/email');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 
 // Admin auth middleware
@@ -95,23 +96,64 @@ router.patch('/users/:id/membership', adminAuth, async (req, res) => {
     membership_type, membership_status 
   } = req.body;
 
-  const updateData = {
-    membership_shopper, status_shopper,
-    membership_breeder, status_breeder,
-    membership_owner, status_owner,
-    membership_type, membership_status
-  };
+  try {
+    // 1. Fetch current profile to check for active subscriptions
+    const { data: profile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('sub_id_shopper, sub_id_breeder, sub_id_owner')
+      .eq('id', req.params.id)
+      .single();
 
-  // Remove undefined fields
-  Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+    if (fetchError) throw fetchError;
 
-  const { error } = await supabase
-    .from('profiles')
-    .update(updateData)
-    .eq('id', req.params.id);
+    const updateData = {
+      membership_shopper, status_shopper,
+      membership_breeder, status_breeder,
+      membership_owner, status_owner,
+      membership_type, membership_status
+    };
 
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ message: 'User updated!' });
+    // 2. Handle Stripe cancellations if downgraded to free
+    const categories = ['shopper', 'breeder', 'owner'];
+    for (const cat of categories) {
+      const field = `membership_${cat}`;
+      const subIdField = `sub_id_${cat}`;
+      const freeTier = `${cat}_free`;
+
+      // If being changed to free AND there is an active subscription
+      if (req.body[field] === freeTier && profile[subIdField]) {
+        try {
+          await stripe.subscriptions.cancel(profile[subIdField]);
+          updateData[subIdField] = null; // Clear the sub ID in DB
+          console.log(`Cancelled Stripe subscription ${profile[subIdField]} for category ${cat}`);
+        } catch (stripeErr) {
+          console.error(`Error cancelling Stripe sub ${profile[subIdField]}:`, stripeErr.message);
+          // We continue even if Stripe fails, but maybe log it
+        }
+      }
+    }
+
+    // Special check for legacy membership_type if it's being set to a free value
+    if (membership_type && membership_type.endsWith('_free')) {
+      updateData.stripe_subscription_id = null;
+      updateData.membership_status = 'cancelled';
+    }
+
+    // Remove undefined fields
+    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', req.params.id);
+
+    if (updateError) return res.status(400).json({ error: updateError.message });
+    res.json({ message: 'User updated and subscriptions cancelled if applicable!' });
+
+  } catch (err) {
+    console.error('Membership update error:', err);
+    res.status(500).json({ error: 'Failed to update membership' });
+  }
 });
 
 router.delete('/users/:id', adminAuth, async (req, res) => {
