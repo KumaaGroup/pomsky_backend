@@ -86,6 +86,26 @@ async function addTagByName(contactId, tagName) {
 }
 
 /**
+ * Subscribe a contact to a list
+ */
+async function subscribeToList(contactId, listId) {
+  try {
+    const response = await activeCampaignApi.post('/api/3/contactLists', {
+      contactList: {
+        list: listId,
+        contact: contactId,
+        status: 1 // 1 = Subscribed
+      }
+    });
+    return response.data;
+  } catch (err) {
+    // If already subscribed, AC might throw an error - we can ignore it
+    console.warn('AC Subscribe to List Warning (might already be subscribed):', err?.response?.data || err.message);
+    return null;
+  }
+}
+
+/**
  * Trigger an email sequence via tag
  */
 async function triggerEmailByTag(email, firstName, lastName, tagName) {
@@ -97,6 +117,15 @@ async function triggerEmailByTag(email, firstName, lastName, tagName) {
 
     const contact = await syncContact(email, firstName, lastName);
     if (contact && contact.id) {
+      // 1. Automatically subscribe to list if LIST_ID is provided
+      const listId = process.env.ACTIVECAMPAIGN_LIST_ID;
+      if (listId) {
+        await subscribeToList(contact.id, listId);
+      } else {
+        console.warn('ACTIVECAMPAIGN_LIST_ID is missing. Emails may be skipped by AC.');
+      }
+
+      // 2. Add the tag to trigger automation
       await addTagByName(contact.id, tagName);
       console.log(`Successfully added tag "${tagName}" to contact ${email}`);
       return true;
