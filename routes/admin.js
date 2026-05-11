@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const supabase = require('../supabase');
 const { sendEmail } = require('../utils/email');
+const { triggerEmailByTag } = require('../utils/activecampaign');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 
@@ -442,31 +443,14 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       return res.status(400).json({ error: insertError.message });
     }
 
-    // Send approval email
-    const contactEmail = request.contact_email;
-    if (contactEmail) {
-      await sendEmail({
-        to: contactEmail,
-        subject: '🎉 Your Litter Listing Has Been Approved!',
-        html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f8fafc;border-radius:12px;">
-            <div style="background:#2094B1;padding:24px;border-radius:8px;text-align:center;margin-bottom:24px;">
-              <h1 style="color:white;margin:0;font-size:24px;">Litter Listing Approved! 🐾</h1>
-            </div>
-            <h2 style="color:#1e293b;">Great news, ${request.name}!</h2>
-            <p style="color:#475569;line-height:1.6;">Your litter listing for <strong>${request.kennel}</strong> has been approved and is now live on our platform.</p>
-            <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
-              <table style="width:100%;font-size:14px;color:#334155;border-collapse:collapse;">
-                <tr><td style="padding:6px 0;color:#64748b;">Kennel</td><td style="font-weight:600;">${request.kennel || '—'}</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">Availability</td><td style="font-weight:600;">${request.availability || '—'}</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">State</td><td style="font-weight:600;">${request.state || '—'}</td></tr>
-              </table>
-            </div>
-            <a href="${process.env.FRONTEND_URL}/dashboard" style="display:inline-block;background:#2094B1;color:white;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;">View Dashboard</a>
-            <p style="color:#94a3b8;font-size:12px;margin-top:32px;">Pomsky Owners Association</p>
-          </div>
-        `
-      });
+    // Trigger ActiveCampaign automation via tag
+    if (request.contact_email) {
+      await triggerEmailByTag(
+        request.contact_email,
+        request.name,
+        '',
+        'Litter Listing Approved'
+      );
     }
 
     res.json({ message: 'Approved + listing created' });
@@ -493,26 +477,14 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
 
     if (error) return res.status(400).json({ error: error.message });
 
-    // Send rejection email
+    // Trigger ActiveCampaign automation via tag
     if (request?.contact_email) {
-      await sendEmail({
-        to: request.contact_email,
-        subject: 'Update on Your Litter Listing – Pomsky Association',
-        html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f8fafc;border-radius:12px;">
-            <div style="background:#64748b;padding:24px;border-radius:8px;text-align:center;margin-bottom:24px;">
-              <h1 style="color:white;margin:0;font-size:22px;">Listing Update</h1>
-            </div>
-            <h2 style="color:#1e293b;">Hi ${request.name},</h2>
-            <p style="color:#475569;line-height:1.6;">Thank you for submitting your litter listing for <strong>${request.kennel}</strong>.</p>
-            <p style="color:#475569;line-height:1.6;">After reviewing your submission, we are unable to approve it at this time. This may be due to incomplete information or not meeting our listing requirements.</p>
-            <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
-              <p style="margin:0;color:#64748b;font-size:14px;">You're welcome to resubmit with updated information. For questions, contact us at <a href="mailto:support@pomskyassociation.com" style="color:#2094B1;">support@pomskyassociation.com</a>.</p>
-            </div>
-            <p style="color:#94a3b8;font-size:12px;margin-top:32px;">Pomsky Owners Association</p>
-          </div>
-        `
-      });
+      await triggerEmailByTag(
+        request.contact_email,
+        request.name,
+        '',
+        'Litter Listing Rejected'
+      );
     }
 
     res.json({ message: 'Litter rejected!' });
@@ -625,31 +597,14 @@ router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
       .update({ status: 'approved' })
       .eq('id', req.params.id);
 
-    // Send approval email
+    // Trigger ActiveCampaign automation via tag
     if (request.email) {
-      await sendEmail({
-        to: request.email,
-        subject: '🎉 Your Breeder Application Has Been Approved!',
-        html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f8fafc;border-radius:12px;">
-            <div style="background:#2094B1;padding:24px;border-radius:8px;text-align:center;margin-bottom:24px;">
-              <h1 style="color:white;margin:0;font-size:24px;">Congratulations, ${request.breeder_name}! 🐾</h1>
-            </div>
-            <h2 style="color:#1e293b;">Your Breeder Application is Approved</h2>
-            <p style="color:#475569;line-height:1.6;">We're thrilled to welcome <strong>${request.business_name || request.breeder_name}</strong> to the Pomsky Owners Association breeder network!</p>
-            <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
-              <p style="margin:0 0 8px;color:#64748b;font-size:14px;">What happens next:</p>
-              <ul style="color:#334155;line-height:1.8;margin:0;padding-left:20px;">
-                <li>Your breeder profile is now live on our platform</li>
-                <li>You can now submit litter listings for review</li>
-                <li>Log in to your dashboard to complete your profile</li>
-              </ul>
-            </div>
-            <a href="${process.env.FRONTEND_URL}/dashboard" style="display:inline-block;background:#2094B1;color:white;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;margin-top:8px;">Go to Dashboard</a>
-            <p style="color:#94a3b8;font-size:12px;margin-top:32px;">Pomsky Owners Association &mdash; ${process.env.FRONTEND_URL}</p>
-          </div>
-        `
-      });
+      await triggerEmailByTag(
+        request.email,
+        request.breeder_name,
+        '',
+        'Breeder Application Approved'
+      );
     }
 
     res.json({ message: 'Breeder onboarding approved' });
@@ -674,26 +629,14 @@ router.patch('/breeder-requests/:id/reject', adminAuth, async (req, res) => {
 
     if (error) return res.status(400).json({ error: error.message });
 
-    // Send rejection email
+    // Trigger ActiveCampaign automation via tag
     if (request?.email) {
-      await sendEmail({
-        to: request.email,
-        subject: 'Update on Your Breeder Application – Pomsky Association',
-        html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f8fafc;border-radius:12px;">
-            <div style="background:#64748b;padding:24px;border-radius:8px;text-align:center;margin-bottom:24px;">
-              <h1 style="color:white;margin:0;font-size:22px;">Application Update</h1>
-            </div>
-            <h2 style="color:#1e293b;">Hi ${request.breeder_name},</h2>
-            <p style="color:#475569;line-height:1.6;">Thank you for applying to join the Pomsky Owners Association as a breeder.</p>
-            <p style="color:#475569;line-height:1.6;">After reviewing your application for <strong>${request.business_name || request.breeder_name}</strong>, we are unable to approve it at this time.</p>
-            <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
-              <p style="margin:0;color:#64748b;font-size:14px;">If you believe this is an error or would like more information, please contact us at <a href="mailto:support@pomskyassociation.com" style="color:#2094B1;">support@pomskyassociation.com</a>.</p>
-            </div>
-            <p style="color:#94a3b8;font-size:12px;margin-top:32px;">Pomsky Owners Association &mdash; ${process.env.FRONTEND_URL}</p>
-          </div>
-        `
-      });
+      await triggerEmailByTag(
+        request.email,
+        request.breeder_name,
+        '',
+        'Breeder Application Rejected'
+      );
     }
 
     res.json({ message: 'Breeder onboarding rejected' });
