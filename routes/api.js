@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../supabase');
 const authMiddleware = require('../middleware/auth');
+const { triggerEmailByTag } = require('../utils/activecampaign');
 
 router.get('/dashboard', authMiddleware, async (req, res) => {
   const userId = req.user.id;
@@ -43,6 +44,26 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
     membership_history: historyResult.data || [],
     breeder_id: breederResult.data?.id || null
   });
+});
+
+router.post('/tag-contact', async (req, res) => {
+  const { email, first_name, tag } = req.body;
+  
+  if (!email || !tag) {
+    return res.status(400).json({ error: 'Email and tag are required' });
+  }
+
+  try {
+    const success = await triggerEmailByTag(email, first_name || '', '', tag);
+    if (success) {
+      return res.json({ message: 'Contact tagged successfully' });
+    } else {
+      return res.status(500).json({ error: 'Failed to tag contact' });
+    }
+  } catch (err) {
+    console.error('Public Tag Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 module.exports = router;
