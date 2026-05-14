@@ -646,5 +646,16 @@ router.patch('/breeder-requests/:id/reject', adminAuth, async (req, res) => {
   }
 });
 
+// Update breeder request
+router.patch('/breeder-requests/:id', adminAuth, async (req, res) => {
+  const { error } = await supabase
+    .from('breeder_requests')
+    .update(req.body)
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ message: 'Breeder request updated!' });
+});
+
 module.exports = router;
 module.exports.adminAuth = adminAuth;

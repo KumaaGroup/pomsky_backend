@@ -153,16 +153,31 @@ router.post('/reset-password', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
 
-  const { error } = await supabase.auth.updateUser(
-    { password: new_password },
-    { access_token }
-  );
+  try {
+    // 1. Verify the token and get the user
+    const { data: { user }, error: userError } = await supabase.auth.getUser(access_token);
+    
+    if (userError || !user) {
+      console.error('RESET TOKEN ERROR:', userError);
+      return res.status(401).json({ error: 'Invalid or expired reset token' });
+    }
 
-  if (error) {
-    return res.status(400).json({ error: error.message });
+    // 2. Update the user using the admin API
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
+      user.id,
+      { password: new_password }
+    );
+
+    if (updateError) {
+      console.error('RESET UPDATE ERROR:', updateError);
+      return res.status(400).json({ error: updateError.message });
+    }
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('RESET PASSWORD CRASH:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  res.json({ message: 'Password updated successfully' });
 });
 
 module.exports = router;
