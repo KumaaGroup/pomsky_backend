@@ -646,5 +646,42 @@ router.patch('/breeder-requests/:id/reject', adminAuth, async (req, res) => {
   }
 });
 
+// Update breeder request
+router.patch('/breeder-requests/:id', adminAuth, async (req, res) => {
+  const payload = { ...req.body };
+
+  // Helper to ensure values are stored as arrays for Postgres text[] columns
+  const toArray = (v) => {
+    if (v === undefined || v === null) return v;
+    if (Array.isArray(v)) return v;
+    if (v === '') return [];
+    return [v]; // Wrap single string in an array
+  };
+
+  // Comprehensive list of all fields that are defined as arrays (text[]) in your database
+  const arrayFields = [
+    'social_facebook', 'social_instagram', 'social_twitter', 'social_youtube', 
+    'kennel_photos_urls', 'profile_image', 'kennel_logo_url',
+    'apkc_proof_url', 'ipa_proof_url', 'good_dog_proof_url'
+  ];
+  
+  arrayFields.forEach(field => {
+    if (payload.hasOwnProperty(field)) {
+      payload[field] = toArray(payload[field]);
+    }
+  });
+
+  const { error } = await supabase
+    .from('breeder_requests')
+    .update(payload)
+    .eq('id', req.params.id);
+
+  if (error) {
+    console.error('BREEDER UPDATE ERROR:', error);
+    return res.status(400).json({ error: error.message });
+  }
+  res.json({ message: 'Breeder request updated!' });
+});
+
 module.exports = router;
 module.exports.adminAuth = adminAuth;
