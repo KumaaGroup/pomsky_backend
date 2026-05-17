@@ -46,11 +46,39 @@ router.post('/login', async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
+  const userId = data.user.id;
+
+  // Fetch profiles to determine role and membership
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('membership_type, membership_breeder')
+    .eq('id', userId)
+    .maybeSingle();
+
+  const membership = profile?.membership_breeder || profile?.membership_type || 'shopper_free';
+  const isBreeder = membership.startsWith('breeder_');
+
+  let redirectPath = redirect_to || '/dashboard';
+
+  if (isBreeder) {
+    const { data: breeder } = await supabase
+      .from('breeder_profiles')
+      .select('is_onboarded, is_approved')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!breeder || !breeder.is_onboarded) {
+      redirectPath = '/breeders-onboarding-form';
+    } else if (!breeder.is_approved && membership === 'breeder_free') {
+      redirectPath = '/breeder/pending-approval';
+    }
+  }
+
   res.json({
     message: 'Logged in!',
     user: data.user,
     access_token: accessToken,
-    redirect: redirect_to ? redirect_to : '/dashboard'
+    redirect: redirectPath
   });
 });
 
