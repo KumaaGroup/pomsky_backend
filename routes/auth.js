@@ -96,7 +96,7 @@ router.get('/me', async (req, res) => {
 
     const { data: breeder } = await supabase
       .from('breeder_profiles')
-      .select('is_onboarded')
+      .select('is_onboarded, is_approved')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -105,6 +105,7 @@ router.get('/me', async (req, res) => {
       // Legacy
       membership_type: profile?.membership_type || null,
       is_onboarded: breeder?.is_onboarded || false,
+      is_approved: breeder?.is_approved || false,
       account_type: profile?.account_type || 'shopper',
       // Multi-role memberships
       membership_shopper: profile?.membership_shopper || 'shopper_free',

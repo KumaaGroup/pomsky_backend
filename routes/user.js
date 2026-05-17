@@ -4,6 +4,7 @@ const multer = require('multer');
 const upload = multer();
 const supabase = require('../supabase');
 const authMiddleware = require('../middleware/auth');
+const approvedBreederMiddleware = require('../middleware/approvedBreeder');
 const { sendEmail } = require('../utils/email');
 
 // ── Membership Management Helpers ──
@@ -357,7 +358,7 @@ router.get('/breeder-profile', authMiddleware, async (req, res) => {
 // ── Pomsky Listings ──
 
 // Add a new listing
-router.post('/listings', authMiddleware, async (req, res) => {
+router.post('/listings', authMiddleware, approvedBreederMiddleware, async (req, res) => {
   const {
     name, gender, pomsky_type, markings,
     price, availability, state, city,
@@ -410,7 +411,7 @@ router.post('/listings', authMiddleware, async (req, res) => {
 });
 
 // Get breeder's own listings
-router.get('/my-listings', authMiddleware, async (req, res) => {
+router.get('/my-listings', authMiddleware, approvedBreederMiddleware, async (req, res) => {
   const { data, error } = await supabase
     .from('pomsky_listings')
     .select('*')
@@ -422,7 +423,7 @@ router.get('/my-listings', authMiddleware, async (req, res) => {
 });
 
 // Update a listing (supports multipart/form-data for image uploads)
-router.patch('/listings/:id', authMiddleware, upload.array('new_images'), async (req, res) => {
+router.patch('/listings/:id', authMiddleware, approvedBreederMiddleware, upload.array('new_images'), async (req, res) => {
   const {
     name, gender, pomsky_type, markings,
     price, availability, state, city,
@@ -476,7 +477,7 @@ router.patch('/listings/:id', authMiddleware, upload.array('new_images'), async 
 });
 
 // Delete a listing
-router.delete('/listings/:id', authMiddleware, async (req, res) => {
+router.delete('/listings/:id', authMiddleware, approvedBreederMiddleware, async (req, res) => {
   const { error } = await supabase
     .from('pomsky_listings')
     .delete()
@@ -652,7 +653,7 @@ router.get('/onboarding-status', authMiddleware, async (req, res) => {
 
   const { data: breeder } = await supabase
     .from('breeder_profiles')
-    .select('is_onboarded, breeder_name, business_name')
+    .select('is_onboarded, is_approved, breeder_name, business_name')
     .eq('user_id', req.user.id)
     .maybeSingle();
 
@@ -663,6 +664,7 @@ router.get('/onboarding-status', authMiddleware, async (req, res) => {
   res.json({
     is_breeder: isBreeder,
     is_onboarded: breeder?.is_onboarded || false,
+    is_approved: breeder?.is_approved || false,
     membership_type: profile?.membership_type,
     breeder_name: breeder?.breeder_name || null
   });

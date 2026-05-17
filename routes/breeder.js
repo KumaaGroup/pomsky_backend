@@ -3,6 +3,8 @@ const upload = multer();
 const express = require('express');
 const router = express.Router();
 const supabase = require('../supabase');
+const authMiddleware = require('../middleware/auth');
+const approvedBreederMiddleware = require('../middleware/approvedBreeder');
 
 // const multer = require('multer');
 // const upload = multer();
@@ -58,17 +60,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/schedule-litter', upload.array('photos'), async (req, res) => {
+router.post('/schedule-litter', authMiddleware, approvedBreederMiddleware, upload.array('photos'), async (req, res) => {
   try {
-    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Not authenticated' });
-
-    const { data: userData } = await supabase.auth.getUser(token);
-    if (!userData || !userData.user) {
-  return res.status(401).json({ error: 'Invalid user' });
-}
-
-const user = userData.user;
+    const user = req.user;
 
     const { data: profile } = await supabase
   .from('profiles')
