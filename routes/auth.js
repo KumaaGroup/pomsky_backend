@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const supabase = require('../supabase');
+const { triggerMembershipTag } = require('../utils/activecampaign');
 
 // REGISTER
 router.post('/register', async (req, res) => {
@@ -22,6 +23,16 @@ router.post('/register', async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message });
   if (!data.user) return res.status(500).json({ error: 'User creation failed' });
+
+  const membershipType = account_type === 'breeder' ? 'breeder_free' : 
+                         account_type === 'owner' ? 'owner_free' : 'shopper_free';
+
+  // Trigger ActiveCampaign tagging for registration
+  try {
+    await triggerMembershipTag(email, name, membershipType);
+  } catch (acErr) {
+    console.error('ActiveCampaign registration tagging error:', acErr.message);
+  }
 
   res.json({ message: 'Registered successfully!', user: data.user });
 });

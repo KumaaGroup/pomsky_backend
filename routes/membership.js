@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../supabase');
 const authMiddleware = require('../middleware/auth');
+const { triggerMembershipTagById } = require('../utils/activecampaign');
 
 // Upgrade membership after payment
 router.post('/upgrade', authMiddleware, async (req, res) => {
@@ -20,6 +21,13 @@ router.post('/upgrade', authMiddleware, async (req, res) => {
     .eq('id', req.user.id);
 
   if (error) return res.status(400).json({ error: error.message });
+
+  // Trigger ActiveCampaign tagging for manual upgrade
+  try {
+    await triggerMembershipTagById(req.user.id, membership_type);
+  } catch (acErr) {
+    console.error('ActiveCampaign manual upgrade tagging error:', acErr.message);
+  }
 
   res.json({ message: `Upgraded to ${membership_type} successfully!` });
 });

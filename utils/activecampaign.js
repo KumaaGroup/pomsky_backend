@@ -137,9 +137,66 @@ async function triggerEmailByTag(email, firstName, lastName, tagName) {
   }
 }
 
+const MEMBERSHIP_TAGS = {
+  breeder_free: 'POA - Breeder - free',
+  breeder_silver: 'POA - Breeder - silver',
+  breeder_gold: 'POA - Breeder - gold',
+  shopper_monthly: 'POA - Shopper - monthly',
+  shopper_lifetime: 'POA - Shopper - annually',
+  shopper_annual: 'POA - Shopper - annually',
+  shopper_annually: 'POA - Shopper - annually',
+  owner_monthly: 'POA - Owner - monthly',
+  owner_annual: 'POA - Owner - annually',
+  owner_annually: 'POA - Owner - annually'
+};
+
+/**
+ * Trigger ActiveCampaign tagging for a specific membership type
+ */
+async function triggerMembershipTag(email, fullName, membershipType) {
+  const tag = MEMBERSHIP_TAGS[membershipType];
+  if (!tag) {
+    console.log(`No ActiveCampaign tag mapped for membership type: ${membershipType}`);
+    return false;
+  }
+
+  const nameParts = (fullName || '').trim().split(/\s+/);
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+
+  return await triggerEmailByTag(email, firstName, lastName, tag);
+}
+
+/**
+ * Trigger ActiveCampaign tagging for a user ID by fetching profile details
+ */
+async function triggerMembershipTagById(userId, membershipType) {
+  try {
+    const supabase = require('../supabase');
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', userId)
+      .single();
+
+    if (error || !profile) {
+      console.error(`Failed to fetch profile for user ${userId} to trigger membership tag:`, error?.message);
+      return false;
+    }
+
+    return await triggerMembershipTag(profile.email, profile.full_name, membershipType);
+  } catch (err) {
+    console.error(`Error in triggerMembershipTagById for user ${userId}:`, err.message);
+    return false;
+  }
+}
+
 module.exports = {
   syncContact,
   getOrCreateTag,
   addTagByName,
-  triggerEmailByTag
+  triggerEmailByTag,
+  triggerMembershipTag,
+  triggerMembershipTagById
 };
+
