@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const supabase = require('../supabase');
 const { sendEmail } = require('../utils/email');
-const { triggerEmailByTag } = require('../utils/activecampaign');
+const { triggerEmailByTag, triggerMembershipTagById } = require('../utils/activecampaign');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 
@@ -149,6 +149,25 @@ router.patch('/users/:id/membership', adminAuth, async (req, res) => {
       .eq('id', req.params.id);
 
     if (updateError) return res.status(400).json({ error: updateError.message });
+
+    // Trigger ActiveCampaign tagging for any updated memberships
+    try {
+      const updatedMemberships = [];
+      if (membership_shopper) updatedMemberships.push(membership_shopper);
+      if (membership_breeder) updatedMemberships.push(membership_breeder);
+      if (membership_owner) updatedMemberships.push(membership_owner);
+      // Fallback/Legacy if none of the above are set but membership_type is
+      if (membership_type && !membership_shopper && !membership_breeder && !membership_owner) {
+        updatedMemberships.push(membership_type);
+      }
+
+      for (const type of updatedMemberships) {
+        await triggerMembershipTagById(req.params.id, type);
+      }
+    } catch (acErr) {
+      console.error('ActiveCampaign admin membership update tagging error:', acErr.message);
+    }
+
     res.json({ message: 'User updated and subscriptions cancelled if applicable!' });
 
   } catch (err) {

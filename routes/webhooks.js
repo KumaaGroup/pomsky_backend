@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const supabase = require('../supabase');
+const { triggerMembershipTagById } = require('../utils/activecampaign');
 
 router.post(
   '/stripe',
@@ -64,6 +65,13 @@ router.post(
             .from('profiles')
             .update(updateData)
             .eq('id', user_id);
+
+          // Trigger ActiveCampaign tagging for the paid membership
+          try {
+            await triggerMembershipTagById(user_id, membership_type);
+          } catch (acErr) {
+            console.error('ActiveCampaign Stripe webhook tagging error:', acErr.message);
+          }
 
           // Log to history
           await supabase

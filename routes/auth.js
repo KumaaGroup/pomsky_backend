@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const supabase = require('../supabase');
+const { triggerMembershipTag } = require('../utils/activecampaign');
 
 // REGISTER
 router.post('/register', async (req, res) => {
@@ -22,6 +23,16 @@ router.post('/register', async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message });
   if (!data.user) return res.status(500).json({ error: 'User creation failed' });
+
+  const membershipType = account_type === 'breeder' ? 'breeder_free' : 
+                         account_type === 'owner' ? 'owner_free' : 'shopper_free';
+
+  // Trigger ActiveCampaign tagging for registration
+  try {
+    await triggerMembershipTag(email, name, membershipType);
+  } catch (acErr) {
+    console.error('ActiveCampaign registration tagging error:', acErr.message);
+  }
 
   res.json({ message: 'Registered successfully!', user: data.user });
 });
@@ -46,11 +57,39 @@ router.post('/login', async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
+  const userId = data.user.id;
+
+  // Fetch profiles to determine role and membership
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('membership_type, membership_breeder')
+    .eq('id', userId)
+    .maybeSingle();
+
+  const membership = profile?.membership_breeder || profile?.membership_type || 'shopper_free';
+  const isBreeder = membership.startsWith('breeder_');
+
+  let redirectPath = redirect_to || '/dashboard';
+
+  if (isBreeder) {
+    const { data: breeder } = await supabase
+      .from('breeder_profiles')
+      .select('is_onboarded, is_approved')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!breeder || !breeder.is_onboarded) {
+      redirectPath = '/breeders-onboarding-form';
+    } else if (!breeder.is_approved && membership === 'breeder_free') {
+      redirectPath = '/breeder/pending-approval';
+    }
+  }
+
   res.json({
     message: 'Logged in!',
     user: data.user,
     access_token: accessToken,
-    redirect: redirect_to ? redirect_to : '/dashboard'
+    redirect: redirectPath
   });
 });
 
@@ -96,7 +135,7 @@ router.get('/me', async (req, res) => {
 
     const { data: breeder } = await supabase
       .from('breeder_profiles')
-      .select('is_onboarded')
+      .select('is_onboarded, is_approved')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -105,6 +144,7 @@ router.get('/me', async (req, res) => {
       // Legacy
       membership_type: profile?.membership_type || null,
       is_onboarded: breeder?.is_onboarded || false,
+      is_approved: breeder?.is_approved || false,
       account_type: profile?.account_type || 'shopper',
       // Multi-role memberships
       membership_shopper: profile?.membership_shopper || 'shopper_free',

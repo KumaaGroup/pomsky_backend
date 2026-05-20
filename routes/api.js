@@ -16,7 +16,7 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
       supabase.from('shipping_addresses').select('*').eq('user_id', userId),
       supabase.from('payment_methods').select('*').eq('user_id', userId),
       supabase.from('membership_history').select('*').eq('user_id', userId).order('started_at', { ascending: false }),
-      supabase.from('breeder_profiles').select('id').eq('user_id', userId).maybeSingle()
+      supabase.from('breeder_profiles').select('id, is_onboarded, is_approved').eq('user_id', userId).maybeSingle()
     ]);
 
   const profile = profileResult.data;
@@ -42,7 +42,9 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
     shipping_addresses: shippingResult.data || [],
     payment_methods: paymentResult.data || [],
     membership_history: historyResult.data || [],
-    breeder_id: breederResult.data?.id || null
+    breeder_id: breederResult.data?.id || null,
+    breeder_is_onboarded: breederResult.data?.is_onboarded || false,
+    breeder_is_approved: breederResult.data?.is_approved || false
   });
 });
 
