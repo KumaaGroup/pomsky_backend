@@ -60,32 +60,45 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/my-requests', async (req, res) => {
+  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  const { data: userData } = await supabase.auth.getUser(token);
+
+  const { data } = await supabase
+    .from('litter_requests')
+    .select('*')
+    .eq('user_id', userData.user.id);
+
+  res.json({ requests: data || [] });
+});
+
+router.get('/meta/states', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('breeder_profiles')
+      .select('state')
+      .eq('is_approved', true)
+      .not('state', 'is', null);
+
+    if (error) throw error;
+
+    const states = [...new Set(data.map(d => d.state))]
+      .filter(Boolean)
+      .sort();
+
+    res.json({ states });
+
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load states' });
+  }
+});
+
 router.post('/schedule-litter', authMiddleware, approvedBreederMiddleware, upload.array('photos'), async (req, res) => {
   try {
     const user = req.user;
-
-    const { data: profile } = await supabase
-  .from('profiles')
-  .select('membership_type')
-  .eq('id', user.id)
-  .single();
-
-if (!profile) {
-  return res.status(400).json({ error: 'Profile not found' });
-}
-
-// ✅ FIXED: allow all breeder types
-const allowedBreeders = [
-  'breeder_free',
-  'breeder_silver',
-  'breeder_gold'
-];
-
-if (!allowedBreeders.includes(profile.membership_type)) {
-  return res.status(403).json({ error: 'Only breeders can submit listings' });
-}
-
-const files = req.files;
+    const files = req.files;
 
 let imageUrls = [];
 
@@ -154,19 +167,6 @@ console.error("STACK:", err.stack);
   }
 });
 
-router.get('/my-requests', async (req, res) => {
-  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-
-  const { data: userData } = await supabase.auth.getUser(token);
-
-  const { data } = await supabase
-    .from('litter_requests')
-    .select('*')
-    .eq('user_id', userData.user.id);
-
-  res.json({ requests: data || [] });
-});
 
 router.get('/:id', async (req, res) => {
   try {
@@ -199,27 +199,6 @@ router.get('/:id', async (req, res) => {
   } catch (err) {
     console.error("SINGLE BREEDER FETCH ERROR:", err);
     res.status(500).json({ error: 'Server error' });
-  }
-});
-
-router.get('/meta/states', async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('breeder_profiles')
-      .select('state')
-      .eq('is_approved', true)
-      .not('state', 'is', null);
-
-    if (error) throw error;
-
-    const states = [...new Set(data.map(d => d.state))]
-      .filter(Boolean)
-      .sort();
-
-    res.json({ states });
-
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to load states' });
   }
 });
 

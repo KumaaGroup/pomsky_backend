@@ -323,7 +323,7 @@ router.get('/breeders', adminAuth, async (req, res) => {
     .from('breeder_profiles')
     .select(`
       *,
-      profiles (full_name, email, membership_type)
+      profiles (full_name, email, membership_type, membership_breeder)
     `)
     .order('created_at', { ascending: false });
 
@@ -565,13 +565,22 @@ router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
     // Fetch user's membership so gold breeders are auto-featured on approval
     const { data: userProfile } = await supabase
       .from('profiles')
-      .select('membership_type')
+      .select('membership_type, membership_breeder')
       .eq('id', request.user_id)
       .maybeSingle();
 
-    const isGold = userProfile?.membership_type === 'breeder_gold';
+    const membership = userProfile?.membership_breeder || userProfile?.membership_type;
+    const isGold = membership === 'breeder_gold';
     // Preserve existing is_featured if already manually set, otherwise base on membership
     const isFeatured = existingBreeder?.is_featured || isGold;
+
+    // Helper to safely extract single string URL or value from text[] array fields
+    const getSingleVal = (val) => {
+      if (Array.isArray(val)) {
+        return val.length > 0 ? val[0] : null;
+      }
+      return val || null;
+    };
 
     const breederPayload = {
       user_id: request.user_id,
@@ -584,13 +593,45 @@ router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
       email: request.email,
       website: request.website,
       bio: request.bio,
-      profile_image: request.profile_image || null,
-      social_facebook: request.social_facebook || null,
-      social_instagram: request.social_instagram || null,
-      social_twitter: request.social_twitter || null,
+
+      // Safely extract string URLs from array fields
+      profile_image: getSingleVal(request.profile_image),
+      kennel_logo_url: getSingleVal(request.kennel_logo_url),
+      social_facebook: getSingleVal(request.social_facebook),
+      social_instagram: getSingleVal(request.social_instagram),
+      social_twitter: getSingleVal(request.social_twitter),
+      social_youtube: getSingleVal(request.social_youtube),
+      social_other: getSingleVal(request.social_other),
+
+      // Map other missing breeder details
+      price_range: request.price_range || null,
+      non_member_action: request.non_member_action || null,
+      available_pomskies_info: request.available_pomskies_info || null,
+      what_is_included: request.what_is_included || null,
+      vet_reference: request.vet_reference || null,
+      health_tests: request.health_tests || null,
+      disclosure: request.disclosure || null,
+      other_comments: request.other_comments || null,
+
+      // Testimonials
+      testimonial_1: request.testimonial_1 || null,
+      testimonial_2: request.testimonial_2 || null,
+      testimonial_3: request.testimonial_3 || null,
+
+      // Memberships
+      apkc_member_status: request.apkc_member_status || null,
+      apkc_proof_url: getSingleVal(request.apkc_proof_url),
+      ipa_member_status: request.ipa_member_status || null,
+      ipa_proof_url: getSingleVal(request.ipa_proof_url),
+      good_dog_member_status: request.good_dog_member_status || null,
+      good_dog_proof_url: getSingleVal(request.good_dog_proof_url),
+
+      // Keep arrays intact for array columns
+      kennel_photos_urls: request.kennel_photos_urls || [],
+
       is_approved: true,
       is_onboarded: true,
-      is_featured: isFeatured  // ✅ gold = auto-featured, silver/free = false
+      is_featured: isFeatured
     };
 
     if (existingBreeder) {

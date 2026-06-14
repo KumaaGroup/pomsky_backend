@@ -169,13 +169,18 @@ router.post('/membership/reactivate', authMiddleware, async (req, res) => {
   res.json({ message: 'Membership reactivated successfully' });
 });
 
-// Helper: wrap a value in an array if it isn't already one
-// Social links & images come from multipart forms as strings, DB expects text[]
+// Helper: wrap a value in an array if it isn't already one.
+// Handles comma-separated values for fields like photos or multiple socials.
 const toArray = (v) => {
-  if (!v) return null;
+  if (v === undefined || v === null) return null;
   if (Array.isArray(v)) return v;
-  return [v]; // single string → single-element array
+  if (typeof v === 'string') {
+    if (v.trim() === '') return null;
+    return v.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return [v];
 };
+
 
 // Update account details
 router.post('/update-account', authMiddleware, async (req, res) => {
@@ -282,11 +287,16 @@ router.delete('/shipping-address/:id', authMiddleware, async (req, res) => {
 router.post('/breeder-profile', authMiddleware, async (req, res) => {
   const {
     breeder_name, business_name, state, city, country, phone, email,
-    website, bio, profile_image,
-    social_facebook, social_instagram, social_twitter, social_youtube,
+    website, bio, profile_image, kennel_logo_url,
+    social_facebook, social_instagram, social_twitter, social_youtube, social_other,
     available_pomskies_info, price_range, what_is_included,
     health_tests, vet_reference,
-    testimonial_1, testimonial_2, testimonial_3
+    testimonial_1, testimonial_2, testimonial_3,
+    apkc_member_status, apkc_proof_url,
+    ipa_member_status, ipa_proof_url,
+    good_dog_member_status, good_dog_proof_url,
+    non_member_action, disclosure, other_comments,
+    agreed_code_of_ethics, kennel_photos_urls
   } = req.body;
 
   if (!breeder_name) return res.status(400).json({ error: 'Breeder name is required' });
@@ -299,15 +309,34 @@ router.post('/breeder-profile', authMiddleware, async (req, res) => {
 
   const payload = {
     breeder_name, business_name, state, city, country: country || 'US',
-    phone, email, website, bio, profile_image,
-    // These columns are text[] in Postgres — must use toArray(), empty string "" is invalid
-    social_facebook:  toArray(social_facebook  || null),
-    social_instagram: toArray(social_instagram || null),
-    social_twitter:   toArray(social_twitter   || null),
-    social_youtube:   toArray(social_youtube   || null),
+    phone, email, website, bio,
+    profile_image: profile_image || null,
+    kennel_logo_url: kennel_logo_url || null,
+    
+    // Arrays in database (need toArray)
+    social_facebook:    toArray(social_facebook),
+    social_instagram:   toArray(social_instagram),
+    social_twitter:     toArray(social_twitter),
+    kennel_photos_urls: toArray(kennel_photos_urls),
+
+    // Strings in database
+    social_youtube: social_youtube || null,
+    social_other:   social_other || null,
+    
     available_pomskies_info, price_range, what_is_included,
     health_tests, vet_reference,
-    testimonial_1, testimonial_2, testimonial_3
+    
+    testimonial_1, testimonial_2, testimonial_3,
+    
+    apkc_member_status,
+    apkc_proof_url: apkc_proof_url || null,
+    ipa_member_status,
+    ipa_proof_url: ipa_proof_url || null,
+    good_dog_member_status,
+    good_dog_proof_url: good_dog_proof_url || null,
+    
+    non_member_action, disclosure, other_comments,
+    agreed_code_of_ethics: agreed_code_of_ethics === 'true' || agreed_code_of_ethics === true
   };
 
   // Strip undefined and empty strings so we don't corrupt existing data
@@ -647,7 +676,7 @@ router.post('/complete-onboarding', authMiddleware, upload.any(), async (req, re
 router.get('/onboarding-status', authMiddleware, async (req, res) => {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('membership_type, account_type')
+    .select('membership_type, membership_breeder, account_type')
     .eq('id', req.user.id)
     .maybeSingle();
 
@@ -657,15 +686,14 @@ router.get('/onboarding-status', authMiddleware, async (req, res) => {
     .eq('user_id', req.user.id)
     .maybeSingle();
 
-  const isBreeder = profile?.membership_type === 'breeder_silver' ||
-                    profile?.membership_type === 'breeder_gold' ||
-                    profile?.membership_type === 'breeder_free';
+  const membership = profile?.membership_breeder || profile?.membership_type || 'shopper_free';
+  const isBreeder = membership.startsWith('breeder_');
 
   res.json({
     is_breeder: isBreeder,
     is_onboarded: breeder?.is_onboarded || false,
     is_approved: breeder?.is_approved || false,
-    membership_type: profile?.membership_type,
+    membership_type: membership,
     breeder_name: breeder?.breeder_name || null
   });
 });

@@ -39,58 +39,63 @@ router.post('/register', async (req, res) => {
 
 // LOGIN
 router.post('/login', async (req, res) => {
-  const { email, password, redirect_to } = req.body;
+  try {
+    const { email, password, redirect_to } = req.body;
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-  if (error) return res.status(401).json({ error: error.message });
+    if (error) return res.status(401).json({ error: error.message });
 
-  const accessToken = data.session?.access_token;
+    const accessToken = data.session?.access_token;
 
-  res.cookie('token', accessToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  });
+    res.cookie('token', accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 
-  const userId = data.user.id;
+    const userId = data.user.id;
 
-  // Fetch profiles to determine role and membership
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('membership_type, membership_breeder')
-    .eq('id', userId)
-    .maybeSingle();
-
-  const membership = profile?.membership_breeder || profile?.membership_type || 'shopper_free';
-  const isBreeder = membership.startsWith('breeder_');
-
-  let redirectPath = redirect_to || '/dashboard';
-
-  if (isBreeder) {
-    const { data: breeder } = await supabase
-      .from('breeder_profiles')
-      .select('is_onboarded, is_approved')
-      .eq('user_id', userId)
+    // Fetch profiles to determine role and membership
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('membership_type, membership_breeder')
+      .eq('id', userId)
       .maybeSingle();
 
-    if (!breeder || !breeder.is_onboarded) {
-      redirectPath = '/breeders-onboarding-form';
-    } else if (!breeder.is_approved && membership === 'breeder_free') {
-      redirectPath = '/breeder/pending-approval';
-    }
-  }
+    const membership = profile?.membership_breeder || profile?.membership_type || 'shopper_free';
+    const isBreeder = membership.startsWith('breeder_');
 
-  res.json({
-    message: 'Logged in!',
-    user: data.user,
-    access_token: accessToken,
-    redirect: redirectPath
-  });
+    let redirectPath = redirect_to || '/dashboard';
+
+    if (isBreeder) {
+      const { data: breeder } = await supabase
+        .from('breeder_profiles')
+        .select('is_onboarded, is_approved')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!breeder || !breeder.is_onboarded) {
+        redirectPath = '/breeders-onboarding-form';
+      } else if (!breeder.is_approved && membership === 'breeder_free') {
+        redirectPath = '/breeder/pending-approval';
+      }
+    }
+
+    res.json({
+      message: 'Logged in!',
+      user: data.user,
+      access_token: accessToken,
+      redirect: redirectPath
+    });
+  } catch (err) {
+    console.error("Login route error:", err);
+    res.status(500).json({ error: "Internal server error during login" });
+  }
 });
 
 // LOGOUT
