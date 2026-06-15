@@ -310,8 +310,9 @@ router.post('/breeder-profile', authMiddleware, async (req, res) => {
   const payload = {
     breeder_name, business_name, state, city, country: country || 'US',
     phone, email, website, bio,
-    profile_image: profile_image || null,
-    kennel_logo_url: kennel_logo_url || null,
+    // profile_image is text[] in Postgres — must be an array, not a plain string
+    profile_image:      toArray(profile_image),
+    kennel_logo_url:    kennel_logo_url || null,
     
     // Arrays in database (need toArray)
     social_facebook:    toArray(social_facebook),
