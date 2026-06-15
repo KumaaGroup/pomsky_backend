@@ -8,7 +8,11 @@ const app = express();
 // const cors = require('cors');
 
 app.use(cors({
-  origin: ['https://pomsky-association.webflow.io', 'https://pomskyownersassociation.com'],
+  origin: [
+    'https://pomsky-association.webflow.io', 
+    'https://pomskyownersassociation.com',
+    'https://www.pomskyownersassociation.com'
+  ],
   credentials: true
 }));
 
