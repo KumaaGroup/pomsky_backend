@@ -485,7 +485,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
   try {
     const { data: request } = await supabase
       .from('litter_requests')
-      .select('name, kennel, contact_email')
+      .select('name, kennel, contact_email, user_id, gender, pomsky_type, markings, price_min, state')
       .eq('id', req.params.id)
       .single();
 
@@ -495,6 +495,24 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
       .eq('id', req.params.id);
 
     if (error) return res.status(400).json({ error: error.message });
+
+    // Also delete the corresponding listing if it was created on approval
+    if (request && request.user_id) {
+      let query = supabase
+        .from('pomsky_listings')
+        .delete()
+        .eq('user_id', request.user_id)
+        .eq('name', request.kennel || 'Pomsky');
+
+      if (request.gender) query = query.eq('gender', request.gender);
+      if (request.pomsky_type) query = query.eq('pomsky_type', request.pomsky_type);
+      if (request.state) query = query.eq('state', request.state);
+
+      const { error: deleteListingError } = await query;
+      if (deleteListingError) {
+        console.error("Error deleting corresponding pomsky listing on rejection:", deleteListingError);
+      }
+    }
 
     // Trigger ActiveCampaign automation via tag
     if (request?.contact_email) {
@@ -506,7 +524,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
       );
     }
 
-    res.json({ message: 'Litter rejected!' });
+    res.json({ message: 'Litter rejected and listing removed from website' });
   } catch (err) {
     console.error('LITTER REJECT ERROR:', err);
     res.status(500).json({ error: 'Server error' });
