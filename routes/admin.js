@@ -678,7 +678,7 @@ router.patch('/breeder-requests/:id/reject', adminAuth, async (req, res) => {
   try {
     const { data: request } = await supabase
       .from('breeder_requests')
-      .select('breeder_name, business_name, email')
+      .select('breeder_name, business_name, email, user_id')
       .eq('id', req.params.id)
       .single();
 
@@ -688,6 +688,14 @@ router.patch('/breeder-requests/:id/reject', adminAuth, async (req, res) => {
       .eq('id', req.params.id);
 
     if (error) return res.status(400).json({ error: error.message });
+
+    // Also delete the breeder profile so they no longer appear on the website
+    if (request && request.user_id) {
+      await supabase
+        .from('breeder_profiles')
+        .delete()
+        .eq('user_id', request.user_id);
+    }
 
     // Trigger ActiveCampaign automation via tag
     if (request?.email) {
@@ -699,7 +707,7 @@ router.patch('/breeder-requests/:id/reject', adminAuth, async (req, res) => {
       );
     }
 
-    res.json({ message: 'Breeder onboarding rejected' });
+    res.json({ message: 'Breeder onboarding rejected and profile removed from directory' });
   } catch (err) {
     console.error('BREEDER REJECT ERROR:', err);
     res.status(500).json({ error: 'Server error' });
@@ -740,7 +748,83 @@ router.patch('/breeder-requests/:id', adminAuth, async (req, res) => {
     console.error('BREEDER UPDATE ERROR:', error);
     return res.status(400).json({ error: error.message });
   }
-  res.json({ message: 'Breeder request updated!' });
+
+  // Sync to breeder_profiles if it exists
+  try {
+    const { data: request } = await supabase
+      .from('breeder_requests')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (request) {
+      const { data: existingBreeder } = await supabase
+        .from('breeder_profiles')
+        .select('id')
+        .eq('user_id', request.user_id)
+        .maybeSingle();
+
+      if (existingBreeder) {
+        const getSingleVal = (val) => {
+          if (Array.isArray(val)) {
+            return val.length > 0 ? val[0] : null;
+          }
+          return val || null;
+        };
+
+        const breederPayload = {
+          breeder_name: request.breeder_name,
+          business_name: request.business_name,
+          state: request.state,
+          city: request.city,
+          country: request.country || 'US',
+          phone: request.phone,
+          email: request.email,
+          website: request.website,
+          bio: request.bio,
+
+          profile_image: getSingleVal(request.profile_image),
+          kennel_logo_url: getSingleVal(request.kennel_logo_url),
+          social_facebook: getSingleVal(request.social_facebook),
+          social_instagram: getSingleVal(request.social_instagram),
+          social_twitter: getSingleVal(request.social_twitter),
+          social_youtube: getSingleVal(request.social_youtube),
+          social_other: getSingleVal(request.social_other),
+
+          price_range: request.price_range || null,
+          non_member_action: request.non_member_action || null,
+          available_pomskies_info: request.available_pomskies_info || null,
+          what_is_included: request.what_is_included || null,
+          vet_reference: request.vet_reference || null,
+          health_tests: request.health_tests || null,
+          disclosure: request.disclosure || null,
+          other_comments: request.other_comments || null,
+
+          testimonial_1: request.testimonial_1 || null,
+          testimonial_2: request.testimonial_2 || null,
+          testimonial_3: request.testimonial_3 || null,
+
+          apkc_member_status: request.apkc_member_status || null,
+          apkc_proof_url: getSingleVal(request.apkc_proof_url),
+          ipa_member_status: request.ipa_member_status || null,
+          ipa_proof_url: getSingleVal(request.ipa_proof_url),
+          good_dog_member_status: request.good_dog_member_status || null,
+          good_dog_proof_url: getSingleVal(request.good_dog_proof_url),
+
+          kennel_photos_urls: request.kennel_photos_urls || []
+        };
+
+        await supabase
+          .from('breeder_profiles')
+          .update(breederPayload)
+          .eq('user_id', request.user_id);
+      }
+    }
+  } catch (syncErr) {
+    console.error('SYNC BREEDER PROFILE ERROR:', syncErr);
+  }
+
+  res.json({ message: 'Breeder request updated and synced to profile!' });
 });
 
 module.exports = router;
