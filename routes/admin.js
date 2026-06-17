@@ -497,12 +497,18 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
 
     // Also delete the corresponding listing if it was created on approval
-    if (request && request.user_id) {
+    if (request) {
       let query = supabase
         .from('pomsky_listings')
         .delete()
-        .eq('user_id', request.user_id)
         .eq('name', request.kennel || 'Pomsky');
+
+      // Fallback: Use contact_email if user_id is missing (for legacy listings)
+      if (request.user_id) {
+        query = query.eq('user_id', request.user_id);
+      } else if (request.contact_email) {
+        query = query.eq('contact_email', request.contact_email);
+      }
 
       if (request.gender) query = query.eq('gender', request.gender);
       if (request.pomsky_type) query = query.eq('pomsky_type', request.pomsky_type);
