@@ -618,12 +618,12 @@ router.patch('/breeder-requests/:id/approve', adminAuth, async (req, res) => {
       website: request.website,
       bio: request.bio,
 
-      // Safely extract string URLs from array fields
-      profile_image: getSingleVal(request.profile_image),
+      // Store array fields as arrays, and extract single string for scalar fields
+      profile_image: request.profile_image || [],
       kennel_logo_url: getSingleVal(request.kennel_logo_url),
-      social_facebook: getSingleVal(request.social_facebook),
-      social_instagram: getSingleVal(request.social_instagram),
-      social_twitter: getSingleVal(request.social_twitter),
+      social_facebook: request.social_facebook || [],
+      social_instagram: request.social_instagram || [],
+      social_twitter: request.social_twitter || [],
       social_youtube: getSingleVal(request.social_youtube),
       social_other: getSingleVal(request.social_other),
 
@@ -742,6 +742,14 @@ router.patch('/breeder-requests/:id/reject', adminAuth, async (req, res) => {
 router.patch('/breeder-requests/:id', adminAuth, async (req, res) => {
   const payload = { ...req.body };
 
+  // Map fields in case frontend/admin UI sends profile_image_url or kennel_logo
+  if (payload.profile_image_url && !payload.profile_image) {
+    payload.profile_image = payload.profile_image_url;
+  }
+  if (payload.kennel_logo && !payload.kennel_logo_url) {
+    payload.kennel_logo_url = payload.kennel_logo;
+  }
+
   // Helper to ensure values are stored as arrays for Postgres text[] columns
   const toArray = (v) => {
     if (v === undefined || v === null) return v;
@@ -752,9 +760,8 @@ router.patch('/breeder-requests/:id', adminAuth, async (req, res) => {
 
   // Comprehensive list of all fields that are defined as arrays (text[]) in your database
   const arrayFields = [
-    'social_facebook', 'social_instagram', 'social_twitter', 'social_youtube', 
-    'kennel_photos_urls', 'profile_image', 'kennel_logo_url',
-    'apkc_proof_url', 'ipa_proof_url', 'good_dog_proof_url'
+    'social_facebook', 'social_instagram', 'social_twitter',
+    'kennel_photos_urls', 'profile_image'
   ];
   
   arrayFields.forEach(field => {
@@ -807,11 +814,11 @@ router.patch('/breeder-requests/:id', adminAuth, async (req, res) => {
           website: request.website,
           bio: request.bio,
 
-          profile_image: getSingleVal(request.profile_image),
+          profile_image: request.profile_image || [],
           kennel_logo_url: getSingleVal(request.kennel_logo_url),
-          social_facebook: getSingleVal(request.social_facebook),
-          social_instagram: getSingleVal(request.social_instagram),
-          social_twitter: getSingleVal(request.social_twitter),
+          social_facebook: request.social_facebook || [],
+          social_instagram: request.social_instagram || [],
+          social_twitter: request.social_twitter || [],
           social_youtube: getSingleVal(request.social_youtube),
           social_other: getSingleVal(request.social_other),
 
