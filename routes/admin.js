@@ -10,7 +10,9 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Admin auth middleware
 const adminAuth = async (req, res, next) => {
-  const token = req.cookies.admin_token;
+  const authHeader = req.headers.authorization;
+  const token = (authHeader && authHeader.split(' ')[1]) || req.cookies.admin_token;
+  
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -59,17 +61,17 @@ router.post('/login', async (req, res) => {
   const token = jwt.sign(
     { id: admin.id, email: admin.email, name: admin.name },
     process.env.JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: '7d' }
   );
 
- res.cookie('admin_token', token, {
-  httpOnly: true,
-  secure: true,
-  sameSite: 'None',
-  path: '/'
-});
+  res.cookie('admin_token', token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  });
 
-  res.json({ message: 'Logged in!', admin: { name: admin.name, email: admin.email } });
+  res.json({ message: 'Logged in', token, admin: { name: admin.name, email: admin.email } });
 });
 
 router.post('/logout', (req, res) => {
@@ -90,11 +92,11 @@ router.get('/users', adminAuth, async (req, res) => {
 });
 
 router.patch('/users/:id/membership', adminAuth, async (req, res) => {
-  const { 
+  const {
     membership_shopper, status_shopper,
     membership_breeder, status_breeder,
     membership_owner, status_owner,
-    membership_type, membership_status 
+    membership_type, membership_status
   } = req.body;
 
   try {
@@ -255,12 +257,12 @@ router.get('/stats', adminAuth, async (req, res) => {
     if (u.membership_owner && u.membership_owner !== 'owner_free') {
       acc[u.membership_owner] = (acc[u.membership_owner] || 0) + 1;
     }
-    
+
     // Add legacy if none of the above are present or for transition
     if (u.membership_type && !u.membership_shopper && !u.membership_breeder && !u.membership_owner) {
       acc[u.membership_type] = (acc[u.membership_type] || 0) + 1;
     }
-    
+
     return acc;
   }, {});
 
@@ -442,7 +444,7 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       .from('pomsky_listings')
       .insert({
         name: request.kennel || 'Pomsky',
-        gender: (request.gender === 'male' || request.gender === 'female') ? request.gender : null,
+        gender: request.gender || null,
         pomsky_type: request.pomsky_type || null,
         markings: request.markings || null,
         price: request.price_min || null,
@@ -510,7 +512,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
         query = query.eq('contact_email', request.contact_email);
       }
 
-      if (request.gender && (request.gender === 'male' || request.gender === 'female')) query = query.eq('gender', request.gender);
+      if (request.gender) query = query.eq('gender', request.gender);
       if (request.pomsky_type) query = query.eq('pomsky_type', request.pomsky_type);
       if (request.state) query = query.eq('state', request.state);
 
@@ -763,7 +765,7 @@ router.patch('/breeder-requests/:id', adminAuth, async (req, res) => {
     'social_facebook', 'social_instagram', 'social_twitter',
     'kennel_photos_urls', 'profile_image'
   ];
-  
+
   arrayFields.forEach(field => {
     if (payload.hasOwnProperty(field)) {
       payload[field] = toArray(payload[field]);
