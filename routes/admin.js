@@ -442,7 +442,7 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       .from('pomsky_listings')
       .insert({
         name: request.kennel || 'Pomsky',
-        gender: request.gender || null,
+        gender: (request.gender === 'male' || request.gender === 'female') ? request.gender : null,
         pomsky_type: request.pomsky_type || null,
         markings: request.markings || null,
         price: request.price_min || null,
@@ -510,7 +510,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
         query = query.eq('contact_email', request.contact_email);
       }
 
-      if (request.gender) query = query.eq('gender', request.gender);
+      if (request.gender && (request.gender === 'male' || request.gender === 'female')) query = query.eq('gender', request.gender);
       if (request.pomsky_type) query = query.eq('pomsky_type', request.pomsky_type);
       if (request.state) query = query.eq('state', request.state);
 
