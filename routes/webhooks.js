@@ -54,6 +54,7 @@ router.post(
             [`status_${category}`]: 'active',
             [`sub_id_${category}`]: session.subscription || null,
             stripe_customer_id: session.customer,
+            account_type: category,
             // Keep legacy fields for backward compatibility during transition
             membership_type,
             membership_status: 'active',
