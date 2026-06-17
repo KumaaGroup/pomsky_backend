@@ -49,6 +49,31 @@ router.post('/upgrade', authMiddleware, async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message });
 
+  // If upgrading to breeder_free, ensure a default breeder profile exists so onboarding loads correctly
+  if (membership_type === 'breeder_free') {
+    try {
+      const { data: existingBreeder } = await supabase
+        .from('breeder_profiles')
+        .select('id')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+
+      if (!existingBreeder) {
+        await supabase
+          .from('breeder_profiles')
+          .insert({
+            user_id: req.user.id,
+            breeder_name: 'New Breeder',
+            business_name: 'Pending Setup',
+            is_featured: false,
+            is_approved: false
+          });
+      }
+    } catch (dbErr) {
+      console.error('Error creating default breeder profile:', dbErr);
+    }
+  }
+
   // Trigger ActiveCampaign tagging for manual upgrade
   try {
     await triggerMembershipTagById(req.user.id, membership_type);
@@ -56,7 +81,16 @@ router.post('/upgrade', authMiddleware, async (req, res) => {
     console.error('ActiveCampaign manual upgrade tagging error:', acErr.message);
   }
 
-  res.json({ message: `Upgraded to ${membership_type} successfully!` });
+  // Determine redirection path for the frontend
+  let redirectUrl = '/dashboard';
+  if (membership_type.startsWith('breeder_')) {
+    redirectUrl = '/breeders-onboarding-form';
+  }
+
+  res.json({ 
+    message: `Upgraded to ${membership_type} successfully!`,
+    redirect: redirectUrl
+  });
 });
 
 // Downgrade to free (when subscription cancelled)
