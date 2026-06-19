@@ -2,6 +2,47 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../supabase');
 
+/* ── Helper to find listing IDs that can show images to visitors ── */
+async function getPublicImageListingIds() {
+  try {
+    const { data: goldBreeders } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('membership_breeder', 'breeder_gold');
+    const goldUserIds = new Set((goldBreeders || []).map(p => p.id));
+
+    const { data: allListings } = await supabase
+      .from('pomsky_listings')
+      .select('id, is_featured, created_at, breeder_profiles(user_id)')
+      .eq('is_active', true);
+
+    if (!allListings) return new Set();
+
+    let listings = allListings.map(l => ({
+      id: l.id,
+      is_featured: l.is_featured || (l.breeder_profiles && goldUserIds.has(l.breeder_profiles.user_id)),
+      created_at: l.created_at
+    }));
+
+    listings.sort((a, b) => {
+      if (a.is_featured && !b.is_featured) return -1;
+      if (!a.is_featured && b.is_featured) return 1;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    const freeLimitIds = listings.slice(0, 6).map(l => l.id);
+
+    let latestListings = [...allListings];
+    latestListings.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const latestIds = latestListings.slice(0, 4).map(l => l.id);
+
+    return new Set([...freeLimitIds, ...latestIds]);
+  } catch (err) {
+    console.error("Error in getPublicImageListingIds:", err);
+    return new Set();
+  }
+}
+
 /* ================================
    🔹 GET META (MUST BE FIRST)
 ================================ */
@@ -76,29 +117,13 @@ router.get('/', async (req, res) => {
 
     const goldUserIds = new Set((goldBreeders || []).map(p => p.id));
 
-    let isPaidMember = false;
+    let isRegisteredUser = false;
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
 
     if (token) {
       const { data: userData } = await supabase.auth.getUser(token);
       if (userData?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('membership_type, membership_shopper, membership_breeder, membership_owner')
-          .eq('id', userData.user.id)
-          .maybeSingle();
-
-        const paidTypes = [
-          'shopper_monthly', 'shopper_lifetime',
-          'owner_monthly', 'owner_annual',
-          'breeder_silver', 'breeder_gold'
-        ];
-
-        isPaidMember =
-          paidTypes.includes(profile?.membership_shopper) ||
-          paidTypes.includes(profile?.membership_breeder) ||
-          paidTypes.includes(profile?.membership_owner) ||
-          paidTypes.includes(profile?.membership_type);
+        isRegisteredUser = true;
       }
     }
 
@@ -117,14 +142,23 @@ router.get('/', async (req, res) => {
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
-    if (!isPaidMember) {
-      const visible = listings.slice(0, FREE_LIMIT);
+    if (!isRegisteredUser) {
+      const allowedIds = await getPublicImageListingIds();
+
+      const visible = listings.slice(0, FREE_LIMIT).map(l => ({
+        ...l,
+        contact_email: null,
+        contact_phone: null
+      }));
+
       const locked = listings.slice(FREE_LIMIT).map(l => ({
         ...l,
         name: 'Members Only',
-        images: [],
+        images: allowedIds.has(l.id) ? l.images : [],
         price: null,
         city: '***',
+        contact_email: null,
+        contact_phone: null,
         is_locked: true
       }));
       listings = [...visible, ...locked];
@@ -133,8 +167,8 @@ router.get('/', async (req, res) => {
     res.json({
       listings,
       total: data?.length || 0,
-      visible: isPaidMember ? data?.length : FREE_LIMIT,
-      is_paid_member: isPaidMember
+      visible: isRegisteredUser ? data?.length : FREE_LIMIT,
+      is_paid_member: isRegisteredUser
     });
 
   } catch (err) {
@@ -186,28 +220,12 @@ router.get('/:id', async (req, res) => {
     const id = req.params.id.trim(); 
 
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-    let isPaidMember = false;
+    let isRegisteredUser = false;
 
     if (token) {
       const { data: userData } = await supabase.auth.getUser(token);
       if (userData?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('membership_type, membership_shopper, membership_breeder, membership_owner')
-          .eq('id', userData.user.id)
-          .maybeSingle();
-
-        const paidTypes = [
-          'shopper_monthly', 'shopper_lifetime',
-          'owner_monthly', 'owner_annual',
-          'breeder_silver', 'breeder_gold'
-        ];
-
-        isPaidMember = 
-          paidTypes.includes(profile?.membership_shopper) ||
-          paidTypes.includes(profile?.membership_breeder) ||
-          paidTypes.includes(profile?.membership_owner) ||
-          paidTypes.includes(profile?.membership_type);
+        isRegisteredUser = true;
       }
     }
 
@@ -230,13 +248,26 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Listing not found' });
     }
 
-    if (!isPaidMember) {
+    if (!isRegisteredUser) {
+      const allowedIds = await getPublicImageListingIds();
+      const showImages = allowedIds.has(id);
+
+      let breederProfile = null;
+      if (data.breeder_profiles) {
+        breederProfile = {
+          ...data.breeder_profiles,
+          phone: null,
+          website: null
+        };
+      }
+
       return res.json({
         listing: {
           ...data,
-          images: [],
+          images: showImages ? data.images : [],
           contact_email: null,
-          contact_phone: null
+          contact_phone: null,
+          breeder_profiles: breederProfile
         },
         locked: true
       });

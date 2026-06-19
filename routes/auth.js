@@ -24,6 +24,31 @@ router.post('/register', async (req, res) => {
   if (error) return res.status(400).json({ error: error.message });
   if (!data.user) return res.status(500).json({ error: 'User creation failed' });
 
+  // Fix database defaults: force unused memberships and statuses to null immediately after creation
+  try {
+    const updateData = {};
+    const effective_account_type = account_type || 'shopper';
+
+    if (effective_account_type !== 'shopper') {
+      updateData.membership_shopper = null;
+      updateData.status_shopper = null;
+    }
+    if (effective_account_type !== 'breeder') {
+      updateData.membership_breeder = null;
+      updateData.status_breeder = null;
+    }
+    if (effective_account_type !== 'owner') {
+      updateData.membership_owner = null;
+      updateData.status_owner = null;
+    }
+    
+    if (Object.keys(updateData).length > 0) {
+      await supabase.from('profiles').update(updateData).eq('id', data.user.id);
+    }
+  } catch (updateErr) {
+    console.error('Error nullifying memberships:', updateErr);
+  }
+
   const membershipType = account_type === 'breeder' ? 'breeder_free' : 
                          account_type === 'owner' ? 'owner_free' : 'shopper_free';
 

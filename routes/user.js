@@ -530,12 +530,17 @@ router.post('/complete-onboarding', authMiddleware, upload.any(), async (req, re
     non_member_action, available_pomskies_info, price_range,
     what_is_included, vet_reference, health_tests,
     testimonial_1, testimonial_2, testimonial_3,
-    disclosure, other_comments, agreed_code_of_ethics
+    disclosure, other_comments, agreed_code_of_ethics,
+    profile_image, profile_image_url,
+    apkc_proof_url, ipa_proof_url, good_dog_proof_url,
+    kennel_logo_url, kennel_logo,
+    kennel_photos_urls, kennel_photos
   } = req.body;
 
   // ── Upload files to Supabase Storage ──
   const files = req.files || [];
   const uploads = {
+    profile_image_url: null,
     apkc_proof_url: null,
     ipa_proof_url: null,
     good_dog_proof_url: null,
@@ -553,7 +558,8 @@ router.post('/complete-onboarding', authMiddleware, upload.any(), async (req, re
       const { data: pub } = supabase.storage.from('pomsky-images').getPublicUrl(fileName);
       
       // Match the file field name
-      if (file.fieldname === 'apkc_proof') uploads.apkc_proof_url = pub.publicUrl;
+      if (file.fieldname === 'profile_image') uploads.profile_image_url = pub.publicUrl;
+      else if (file.fieldname === 'apkc_proof') uploads.apkc_proof_url = pub.publicUrl;
       else if (file.fieldname === 'ipa_proof') uploads.ipa_proof_url = pub.publicUrl;
       else if (file.fieldname === 'good_dog_proof') uploads.good_dog_proof_url = pub.publicUrl;
       else if (file.fieldname === 'kennel_logo') uploads.kennel_logo_url = pub.publicUrl;
@@ -608,11 +614,12 @@ router.post('/complete-onboarding', authMiddleware, upload.any(), async (req, re
     disclosure,
     other_comments,
     agreed_code_of_ethics: agreed_code_of_ethics === 'true' || agreed_code_of_ethics === true,
-    apkc_proof_url: uploads.apkc_proof_url,
-    ipa_proof_url: uploads.ipa_proof_url,
-    good_dog_proof_url: uploads.good_dog_proof_url,
-    kennel_logo_url: uploads.kennel_logo_url,
-    kennel_photos_urls: uploads.kennel_photos_urls
+    profile_image: toArray(uploads.profile_image_url || profile_image || profile_image_url),
+    apkc_proof_url: uploads.apkc_proof_url || apkc_proof_url || null,
+    ipa_proof_url: uploads.ipa_proof_url || ipa_proof_url || null,
+    good_dog_proof_url: uploads.good_dog_proof_url || good_dog_proof_url || null,
+    kennel_logo_url: uploads.kennel_logo_url || kennel_logo_url || kennel_logo || null,
+    kennel_photos_urls: uploads.kennel_photos_urls.length > 0 ? uploads.kennel_photos_urls : toArray(kennel_photos_urls || kennel_photos)
   };
 
   // Save full request data so admin can review
