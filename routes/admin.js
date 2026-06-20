@@ -12,7 +12,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const adminAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = (authHeader && authHeader.split(' ')[1]) || req.cookies.admin_token;
-  
+
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -321,17 +321,40 @@ router.delete('/listings/:id', adminAuth, async (req, res) => {
 
 // Get all breeder profiles
 router.get('/breeders', adminAuth, async (req, res) => {
-  const { data, error } = await supabase
-    .from('breeder_profiles')
-    .select(`
-      *,
-      profiles (full_name, email, membership_type, membership_breeder)
-    `)
-    .order('created_at', { ascending: false });
+  try {
+    const { data: breeders, error } = await supabase
+      .from('breeder_profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ breeders: data });
+    if (error) return res.status(400).json({ error: error.message });
+
+    const userIds = breeders.map(b => b.user_id).filter(Boolean);
+    const profilesMap = new Map();
+
+    if (userIds.length > 0) {
+      const { data: profiles, error: pError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, membership_type, membership_breeder')
+        .in('id', userIds);
+
+      if (!pError && profiles) {
+        profiles.forEach(p => profilesMap.set(p.id, p));
+      }
+    }
+
+    const merged = breeders.map(b => ({
+      ...b,
+      profiles: profilesMap.get(b.user_id) || null
+    }));
+
+    res.json({ breeders: merged });
+  } catch (err) {
+    console.error('GET BREEDERS ERROR:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
+
 
 // Approve or feature a breeder
 router.patch('/breeders/:id', adminAuth, async (req, res) => {
@@ -393,14 +416,25 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    // 2. Get or auto-create breeder profile
+    // 2. Get or auto-create breeder profile and check featured status
     let breeder = null;
+    let isFeatured = false;
 
     const { data: existingBreeder } = await supabase
       .from('breeder_profiles')
-      .select('id')
+      .select('id, is_featured')
       .eq('user_id', request.user_id)
       .maybeSingle();
+
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('membership_type, membership_breeder')
+      .eq('id', request.user_id)
+      .maybeSingle();
+
+    const membership = userProfile?.membership_breeder || userProfile?.membership_type;
+    const isGold = membership === 'breeder_gold';
+    isFeatured = existingBreeder?.is_featured || isGold;
 
     if (existingBreeder) {
       breeder = existingBreeder;
@@ -413,7 +447,7 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
           business_name: request.kennel || 'Pending Setup',
           state: request.state || null,
           is_approved: true,
-          is_featured: false
+          is_featured: isFeatured
         })
         .select('id')
         .single();
@@ -454,6 +488,7 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
         user_id: request.user_id, // ✅ Add missing user_id so it shows in breeder portal
         is_active: true,
         is_new_litter: true,
+        is_featured: isFeatured, // Set listing featured status based on breeder profile/membership
         contact_email: request.contact_email || null,
         contact_phone: request.contact_phone || null,
         images: request.images || []
