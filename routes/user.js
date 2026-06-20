@@ -586,7 +586,7 @@ router.post('/complete-onboarding', authMiddleware, upload.any(), async (req, re
 
   const logoValue = uploads.kennel_logo_url || kennel_logo_url || kennel_logo || null;
   const profileImgArray = toArray(uploads.profile_image_url || profile_image || profile_image_url);
-  const profileImgValue = profileImgArray.length > 0 ? profileImgArray[0] : null;
+  const profileImgValue = (profileImgArray && profileImgArray.length > 0) ? profileImgArray[0] : null;
 
   let finalLogo = logoValue;
   let finalProfileImg = profileImgValue;
