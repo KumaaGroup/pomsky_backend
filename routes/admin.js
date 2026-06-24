@@ -535,7 +535,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
   try {
     const { data: request } = await supabase
       .from('litter_requests')
-      .select('name, kennel, contact_email, user_id, gender, pomsky_type, markings, price_min, state')
+      .select('name, kennel, contact_email, user_id, gender, pomsky_type, markings, price_min, state, is_new_litter')
       .eq('id', req.params.id)
       .single();
 
@@ -547,7 +547,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
 
     // Also delete the corresponding listing if it was created on approval
-    if (request) {
+    if (request && request.is_new_litter !== false) {
       let query = supabase
         .from('pomsky_listings')
         .delete()
@@ -570,8 +570,8 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
       }
     }
 
-    // Trigger ActiveCampaign automation via tag
-    if (request?.contact_email) {
+    // Trigger ActiveCampaign automation via tag (only for new listings)
+    if (request?.is_new_litter !== false && request?.contact_email) {
       await triggerEmailByTag(
         request.contact_email,
         request.name,
@@ -580,7 +580,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
       );
     }
 
-    res.json({ message: 'Litter rejected and listing removed from website' });
+    res.json({ message: request?.is_new_litter === false ? 'Blast request rejected' : 'Litter rejected and listing removed from website' });
   } catch (err) {
     console.error('LITTER REJECT ERROR:', err);
     res.status(500).json({ error: 'Server error' });
