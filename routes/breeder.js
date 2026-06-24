@@ -95,74 +95,236 @@ router.get('/meta/states', async (req, res) => {
   }
 });
 
+router.get('/email-blast-eligibility', authMiddleware, async (req, res) => {
+  try {
+    const user = req.user;
+
+    const { data: profile, error: pError } = await supabase
+      .from('profiles')
+      .select('membership_breeder, membership_type')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (pError) throw pError;
+    const membership = profile?.membership_breeder || profile?.membership_type || 'shopper_free';
+    const isGold = membership === 'breeder_gold';
+
+    if (!isGold) {
+      return res.json({ eligible: false, reason: 'NOT_GOLD', membershipType: membership });
+    }
+
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const { data: existingBlasts, error: checkError } = await supabase
+      .from('litter_requests')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('request_email_blast', true)
+      .gte('created_at', startOfMonth);
+
+    if (checkError) throw checkError;
+
+    if (existingBlasts && existingBlasts.length > 0) {
+      return res.json({ eligible: false, reason: 'QUOTA_EXCEEDED', membershipType: membership });
+    }
+
+    res.json({ eligible: true, membershipType: membership });
+  } catch (err) {
+    console.error("ELIGIBILITY ERROR:", err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/listings/:id/request-blast', authMiddleware, approvedBreederMiddleware, async (req, res) => {
+  try {
+    const user = req.user;
+    const listingId = req.params.id;
+
+    // 1. Fetch user's membership and check if gold
+    const { data: profile, error: pError } = await supabase
+      .from('profiles')
+      .select('membership_breeder, membership_type')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (pError) throw pError;
+    const membership = profile?.membership_breeder || profile?.membership_type || 'shopper_free';
+    if (membership !== 'breeder_gold') {
+      return res.status(403).json({ error: 'Only Gold Breeders can request an email blast.' });
+    }
+
+    // 2. Calendar month check
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const { data: existingBlasts, error: checkError } = await supabase
+      .from('litter_requests')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('request_email_blast', true)
+      .gte('created_at', startOfMonth);
+
+    if (checkError) throw checkError;
+    if (existingBlasts && existingBlasts.length > 0) {
+      return res.status(400).json({ error: 'You have already requested an email blast this calendar month.' });
+    }
+
+    // 3. Fetch listing details to ensure it belongs to the breeder
+    const { data: listing, error: listingError } = await supabase
+      .from('pomsky_listings')
+      .select('*')
+      .eq('id', listingId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (listingError || !listing) {
+      return res.status(404).json({ error: 'Listing not found or access denied.' });
+    }
+
+    // 4. Fetch breeder profile business name for kennel field
+    const { data: breederProfile } = await supabase
+      .from('breeder_profiles')
+      .select('business_name, breeder_name')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const kennelName = breederProfile?.business_name || breederProfile?.breeder_name || 'Pomsky Breeder';
+
+    // 5. Insert new request into litter_requests
+    const { error: insertError } = await supabase
+      .from('litter_requests')
+      .insert({
+        user_id: user.id,
+        name: listing.name,
+        kennel: kennelName,
+        message: listing.description || '',
+        url: '',
+        date: new Date().toISOString().split('T')[0],
+        status: 'pending',
+        availability: listing.availability || 'available',
+        puppies_available: 1,
+        state: listing.state || '',
+        price_min: listing.price ? parseInt(listing.price, 10) : 0,
+        price_max: listing.price ? parseInt(listing.price, 10) : 0,
+        next_litter: '',
+        pomsky_type: listing.pomsky_type || '',
+        gender: listing.gender || '',
+        markings: listing.markings || '',
+        contact_email: listing.contact_email || '',
+        contact_phone: listing.contact_phone || '',
+        images: listing.images || [],
+        request_email_blast: true,
+        is_new_litter: false,
+      });
+
+    if (insertError) {
+      console.error("Blast request insert error:", insertError);
+      return res.status(400).json({ error: insertError.message });
+    }
+
+    res.json({ message: 'Email blast request submitted successfully to admin.' });
+  } catch (err) {
+    console.error("REQUEST BLAST ERROR:", err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.post('/schedule-litter', authMiddleware, approvedBreederMiddleware, upload.array('photos'), async (req, res) => {
   try {
     const user = req.user;
     const files = req.files;
 
-let imageUrls = [];
+    let imageUrls = [];
 
-if (files && files.length > 0) {
-  for (let file of files) {
-    const fileName = `${Date.now()}-${Math.random()}-${file.originalname}`;
+    if (files && files.length > 0) {
+      for (let file of files) {
+        const fileName = `${Date.now()}-${Math.random()}-${file.originalname}`;
 
-    const { data, error } = await supabase.storage
-      .from('pomsky-images') // 👈 create this bucket
-      .upload(fileName, file.buffer, {
-        contentType: file.mimetype
-      });
+        const { data, error } = await supabase.storage
+          .from('pomsky-images')
+          .upload(fileName, file.buffer, {
+            contentType: file.mimetype
+          });
 
-    if (error) {
-  console.error("❌ IMAGE UPLOAD ERROR:", error);
-} else {
-  const { data: publicUrl } = supabase
-    .storage
-    .from('pomsky-images')
-    .getPublicUrl(fileName);
+        if (error) {
+          console.error("❌ IMAGE UPLOAD ERROR:", error);
+        } else {
+          const { data: publicUrl } = supabase
+            .storage
+            .from('pomsky-images')
+            .getPublicUrl(fileName);
 
-  imageUrls.push(publicUrl.publicUrl);
-}
-  }
-}
+          imageUrls.push(publicUrl.publicUrl);
+        }
+      }
+    }
 
-    const { name, kennel, message, url, date, availability, puppies_available, state, price_min, price_max, next_litter, pomsky_type, gender, markings, contact_email, contact_phone,} = req.body;
+    const { name, kennel, message, url, date, availability, puppies_available, state, price_min, price_max, next_litter, pomsky_type, gender, markings, contact_email, contact_phone, request_email_blast } = req.body;
+    const isEmailBlastRequested = request_email_blast === 'true' || request_email_blast === true;
+
+    if (isEmailBlastRequested) {
+      // 1. Fetch user's membership and check if gold
+      const { data: profile, error: pError } = await supabase
+        .from('profiles')
+        .select('membership_breeder, membership_type')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (pError) throw pError;
+      const membership = profile?.membership_breeder || profile?.membership_type || 'shopper_free';
+      if (membership !== 'breeder_gold') {
+        return res.status(403).json({ error: 'Only Gold Breeders can request an email blast.' });
+      }
+
+      // 2. Calendar month check
+      const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+      const { data: existingBlasts, error: checkError } = await supabase
+        .from('litter_requests')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('request_email_blast', true)
+        .gte('created_at', startOfMonth);
+
+      if (checkError) throw checkError;
+      if (existingBlasts && existingBlasts.length > 0) {
+        return res.status(400).json({ error: 'You have already requested an email blast this calendar month.' });
+      }
+    }
 
     const { error: insertError } = await supabase
-  .from('litter_requests')
-  .insert({
-    user_id: user.id,
-    name,
-    kennel,
-    message,
-    url,
-    date,
-    status: 'pending',
-    availability,
-    puppies_available,
-    state,
-    price_min,
-    price_max,
-    next_litter,
-    pomsky_type,
-    gender,
-    markings,
-    contact_email,
-    contact_phone,
-    images: imageUrls,
-  });
+      .from('litter_requests')
+      .insert({
+        user_id: user.id,
+        name,
+        kennel,
+        message,
+        url,
+        date,
+        status: 'pending',
+        availability,
+        puppies_available,
+        state,
+        price_min,
+        price_max,
+        next_litter,
+        pomsky_type,
+        gender,
+        markings,
+        contact_email,
+        contact_phone,
+        images: imageUrls,
+        request_email_blast: isEmailBlastRequested,
+        is_new_litter: true,
+      });
 
-if (insertError) {
-  console.error("❌ INSERT ERROR:", insertError);
-  return res.status(400).json({ error: insertError.message });
-}
+    if (insertError) {
+      console.error("❌ INSERT ERROR:", insertError);
+      return res.status(400).json({ error: insertError.message });
+    }
 
     res.json({ message: 'Submitted successfully' });
     console.log("FILES:", req.files);
-console.log("UPLOAD URLS:", imageUrls);
+    console.log("UPLOAD URLS:", imageUrls);
 
   } catch (err) {
     console.error("FULL ERROR:", err);
-console.error("STACK:", err.stack);
+    console.error("STACK:", err.stack);
     res.status(500).json({ error: 'Server error' });
   }
 });
