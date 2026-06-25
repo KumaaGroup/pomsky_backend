@@ -391,7 +391,7 @@ router.get('/breeder-profile', authMiddleware, async (req, res) => {
 router.post('/listings', authMiddleware, approvedBreederMiddleware, async (req, res) => {
   const {
     name, gender, pomsky_type, markings,
-    price, availability, state, city,
+    price, price_min, price_max, availability, state, city,
     images, description, birth_date, is_new_litter, puppies_available
   } = req.body;
 
@@ -412,7 +412,10 @@ router.post('/listings', authMiddleware, approvedBreederMiddleware, async (req, 
       breeder_id: breeder.id,
       user_id: req.user.id,
       name, gender, pomsky_type, markings,
-      price, availability: availability || 'available',
+      price,
+      price_min: price_min ? Number(price_min) : null,
+      price_max: price_max ? Number(price_max) : null,
+      availability: availability || 'available',
       state, city,
       images: images || [],
       description, birth_date,
@@ -457,7 +460,7 @@ router.get('/my-listings', authMiddleware, approvedBreederMiddleware, async (req
 router.patch('/listings/:id', authMiddleware, approvedBreederMiddleware, upload.array('new_images'), async (req, res) => {
   const {
     name, gender, pomsky_type, markings,
-    price, availability, state, city,
+    price, price_min, price_max, availability, state, city,
     description, is_new_litter, puppies_available,
     existing_images  // JSON string of image URLs to keep
   } = req.body;
@@ -488,6 +491,8 @@ router.patch('/listings/:id', authMiddleware, approvedBreederMiddleware, upload.
   const payload = {
     name, gender, pomsky_type, markings,
     price: price ? Number(price) : null,
+    price_min: price_min ? Number(price_min) : null,
+    price_max: price_max ? Number(price_max) : null,
     availability, state, city,
     images: finalImages,
     description,

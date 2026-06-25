@@ -479,6 +479,8 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
           pomsky_type: request.pomsky_type || null,
           markings: request.markings || null,
           price: request.price_min || null,
+          price_min: request.price_min || null,
+          price_max: request.price_max || null,
           availability: request.availability || 'available',
           state: request.state || null,
           breeder_id: breeder.id,

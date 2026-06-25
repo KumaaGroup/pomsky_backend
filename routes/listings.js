@@ -81,7 +81,7 @@ router.get('/', async (req, res) => {
     let query = supabase
       .from('pomsky_listings')
       .select(`
-  id, breeder_id, name, gender, pomsky_type, markings, price,
+  id, breeder_id, name, gender, pomsky_type, markings, price, price_min, price_max,
   availability, state, city, country,
   images, description, puppies_available,
   contact_email, contact_phone,
@@ -232,7 +232,7 @@ router.get('/:id', async (req, res) => {
     const { data, error } = await supabase
       .from('pomsky_listings')
       .select(`
-        id, name, gender, pomsky_type, markings, price,
+        id, name, gender, pomsky_type, markings, price, price_min, price_max,
         availability, state, city, images, puppies_available,
         contact_email, contact_phone,
         description, birth_date, is_new_litter, created_at,
