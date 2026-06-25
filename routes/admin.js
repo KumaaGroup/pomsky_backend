@@ -484,11 +484,12 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
           breeder_id: breeder.id,
           user_id: request.user_id,
           is_active: true,
-          is_new_litter: true,
+          is_new_litter: request.is_new_litter !== false,
           is_featured: isFeatured,
           contact_email: request.contact_email || null,
           contact_phone: request.contact_phone || null,
-          images: request.images || []
+          images: request.images || [],
+          description: request.message || null
         });
 
       if (insertError) {
