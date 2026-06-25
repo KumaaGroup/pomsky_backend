@@ -391,8 +391,8 @@ router.get('/breeder-profile', authMiddleware, async (req, res) => {
 router.post('/listings', authMiddleware, approvedBreederMiddleware, async (req, res) => {
   const {
     name, gender, pomsky_type, markings,
-    price, availability, state, city,
-    images, description, birth_date, is_new_litter
+    price, price_min, price_max, availability, state, city,
+    images, description, birth_date, is_new_litter, puppies_available
   } = req.body;
 
   // Get breeder profile first
@@ -412,11 +412,15 @@ router.post('/listings', authMiddleware, approvedBreederMiddleware, async (req, 
       breeder_id: breeder.id,
       user_id: req.user.id,
       name, gender, pomsky_type, markings,
-      price, availability: availability || 'available',
+      price,
+      price_min: price_min ? Number(price_min) : null,
+      price_max: price_max ? Number(price_max) : null,
+      availability: availability || 'available',
       state, city,
       images: images || [],
       description, birth_date,
-      is_new_litter: is_new_litter || false
+      is_new_litter: is_new_litter || false,
+      puppies_available: puppies_available ? Number(puppies_available) : null
     })
     .select()
     .single();
@@ -456,8 +460,8 @@ router.get('/my-listings', authMiddleware, approvedBreederMiddleware, async (req
 router.patch('/listings/:id', authMiddleware, approvedBreederMiddleware, upload.array('new_images'), async (req, res) => {
   const {
     name, gender, pomsky_type, markings,
-    price, availability, state, city,
-    description, is_new_litter,
+    price, price_min, price_max, availability, state, city,
+    description, is_new_litter, puppies_available,
     existing_images  // JSON string of image URLs to keep
   } = req.body;
 
@@ -487,10 +491,13 @@ router.patch('/listings/:id', authMiddleware, approvedBreederMiddleware, upload.
   const payload = {
     name, gender, pomsky_type, markings,
     price: price ? Number(price) : null,
+    price_min: price_min ? Number(price_min) : null,
+    price_max: price_max ? Number(price_max) : null,
     availability, state, city,
     images: finalImages,
     description,
-    is_new_litter: is_new_litter === 'true' || is_new_litter === true
+    is_new_litter: is_new_litter === 'true' || is_new_litter === true,
+    puppies_available: puppies_available ? Number(puppies_available) : null
   };
 
   // Strip undefined values so we don't accidentally null out fields
@@ -584,6 +591,19 @@ router.post('/complete-onboarding', authMiddleware, upload.any(), async (req, re
     return res.status(500).json({ error: fetchError.message });
   }
 
+  const logoValue = uploads.kennel_logo_url || kennel_logo_url || kennel_logo || null;
+  const profileImgArray = toArray(uploads.profile_image_url || profile_image || profile_image_url);
+  const profileImgValue = (profileImgArray && profileImgArray.length > 0) ? profileImgArray[0] : null;
+
+  let finalLogo = logoValue;
+  let finalProfileImg = profileImgValue;
+
+  if (finalLogo && !finalProfileImg) {
+    finalProfileImg = finalLogo;
+  } else if (finalProfileImg && !finalLogo) {
+    finalLogo = finalProfileImg;
+  }
+
   const payload = {
     breeder_name,
     business_name,
@@ -614,13 +634,14 @@ router.post('/complete-onboarding', authMiddleware, upload.any(), async (req, re
     disclosure,
     other_comments,
     agreed_code_of_ethics: agreed_code_of_ethics === 'true' || agreed_code_of_ethics === true,
-    profile_image: toArray(uploads.profile_image_url || profile_image || profile_image_url),
+    profile_image: toArray(finalProfileImg),
     apkc_proof_url: uploads.apkc_proof_url || apkc_proof_url || null,
     ipa_proof_url: uploads.ipa_proof_url || ipa_proof_url || null,
     good_dog_proof_url: uploads.good_dog_proof_url || good_dog_proof_url || null,
-    kennel_logo_url: uploads.kennel_logo_url || kennel_logo_url || kennel_logo || null,
+    kennel_logo_url: finalLogo,
     kennel_photos_urls: uploads.kennel_photos_urls.length > 0 ? uploads.kennel_photos_urls : toArray(kennel_photos_urls || kennel_photos)
   };
+
 
   // Save full request data so admin can review
   const { error: requestError } = await supabase

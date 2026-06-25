@@ -12,7 +12,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const adminAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = (authHeader && authHeader.split(' ')[1]) || req.cookies.admin_token;
-  
+
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -236,11 +236,13 @@ router.delete('/store-items/:id', adminAuth, async (req, res) => {
 // ── Dashboard Stats ──
 
 router.get('/stats', adminAuth, async (req, res) => {
-  const [usersResult, storeResult, ordersResult, listingsResult] = await Promise.all([
+  const [usersResult, storeResult, ordersResult, listingsResult, breederReqsResult, litterReqsResult] = await Promise.all([
     supabase.from('profiles').select('membership_type, membership_shopper, membership_breeder, membership_owner'),
     supabase.from('store_items').select('id, is_active'),
     supabase.from('orders').select('total, status'),
-    supabase.from('pomsky_listings').select('id, is_active')
+    supabase.from('pomsky_listings').select('id, is_active'),
+    supabase.from('breeder_requests').select('id').eq('status', 'pending'),
+    supabase.from('litter_requests').select('id, request_email_blast').eq('status', 'pending')
   ]);
 
   const users = usersResult.data || [];
@@ -266,6 +268,9 @@ router.get('/stats', adminAuth, async (req, res) => {
     return acc;
   }, {});
 
+  const pendingLitters = (litterReqsResult.data || []).filter(l => !l.request_email_blast).length;
+  const pendingBlasts = (litterReqsResult.data || []).filter(l => l.request_email_blast).length;
+
   res.json({
     total_users: users.length,
     total_store_items: (storeResult.data || []).length,
@@ -273,7 +278,10 @@ router.get('/stats', adminAuth, async (req, res) => {
     total_orders: (ordersResult.data || []).length,
     total_listings: (listingsResult.data || []).length,
     active_listings: (listingsResult.data || []).filter(l => l.is_active).length,
-    membership_counts: membershipCounts
+    membership_counts: membershipCounts,
+    pending_breeders_count: (breederReqsResult.data || []).length,
+    pending_litters_count: pendingLitters,
+    pending_blasts_count: pendingBlasts
   });
 });
 
@@ -321,17 +329,40 @@ router.delete('/listings/:id', adminAuth, async (req, res) => {
 
 // Get all breeder profiles
 router.get('/breeders', adminAuth, async (req, res) => {
-  const { data, error } = await supabase
-    .from('breeder_profiles')
-    .select(`
-      *,
-      profiles (full_name, email, membership_type, membership_breeder)
-    `)
-    .order('created_at', { ascending: false });
+  try {
+    const { data: breeders, error } = await supabase
+      .from('breeder_profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ breeders: data });
+    if (error) return res.status(400).json({ error: error.message });
+
+    const userIds = breeders.map(b => b.user_id).filter(Boolean);
+    const profilesMap = new Map();
+
+    if (userIds.length > 0) {
+      const { data: profiles, error: pError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, membership_type, membership_breeder')
+        .in('id', userIds);
+
+      if (!pError && profiles) {
+        profiles.forEach(p => profilesMap.set(p.id, p));
+      }
+    }
+
+    const merged = breeders.map(b => ({
+      ...b,
+      profiles: profilesMap.get(b.user_id) || null
+    }));
+
+    res.json({ breeders: merged });
+  } catch (err) {
+    console.error('GET BREEDERS ERROR:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
+
 
 // Approve or feature a breeder
 router.patch('/breeders/:id', adminAuth, async (req, res) => {
@@ -370,7 +401,7 @@ router.get('/litter-requests', adminAuth, async (req, res) => {
       price_min, price_max, next_litter,
       pomsky_type, gender, markings,
       contact_email, contact_phone, images,
-      user_id
+      user_id, request_email_blast, email_blast_sent, is_new_litter
     `)
     .order('created_at', { ascending: false });
 
@@ -393,45 +424,91 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    // 2. Get or auto-create breeder profile
-    let breeder = null;
+    // 2. Conditional listing insertion (only if is_new_litter is true or null/undefined)
+    if (request.is_new_litter !== false) {
+      let breeder = null;
+      let isFeatured = false;
 
-    const { data: existingBreeder } = await supabase
-      .from('breeder_profiles')
-      .select('id')
-      .eq('user_id', request.user_id)
-      .maybeSingle();
-
-    if (existingBreeder) {
-      breeder = existingBreeder;
-    } else {
-      const { data: newBreeder, error: createError } = await supabase
+      const { data: existingBreeder } = await supabase
         .from('breeder_profiles')
-        .insert({
-          user_id: request.user_id,
-          breeder_name: request.name || 'New Breeder',
-          business_name: request.kennel || 'Pending Setup',
-          state: request.state || null,
-          is_approved: true,
-          is_featured: false
-        })
-        .select('id')
-        .single();
+        .select('id, is_featured')
+        .eq('user_id', request.user_id)
+        .maybeSingle();
 
-      if (createError) {
-        console.error("CREATE BREEDER ERROR:", createError);
-        return res.status(400).json({ error: 'Could not create breeder profile: ' + createError.message });
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('membership_type, membership_breeder')
+        .eq('id', request.user_id)
+        .maybeSingle();
+
+      const membership = userProfile?.membership_breeder || userProfile?.membership_type;
+      const isGold = membership === 'breeder_gold';
+      isFeatured = existingBreeder?.is_featured || isGold;
+
+      if (existingBreeder) {
+        breeder = existingBreeder;
+      } else {
+        const { data: newBreeder, error: createError } = await supabase
+          .from('breeder_profiles')
+          .insert({
+            user_id: request.user_id,
+            breeder_name: request.name || 'New Breeder',
+            business_name: request.kennel || 'Pending Setup',
+            state: request.state || null,
+            is_approved: true,
+            is_featured: isFeatured
+          })
+          .select('id')
+          .single();
+
+        if (createError) {
+          console.error("CREATE BREEDER ERROR:", createError);
+          return res.status(400).json({ error: 'Could not create breeder profile: ' + createError.message });
+        }
+
+        breeder = newBreeder;
       }
 
-      breeder = newBreeder;
+      console.log("BREEDER:", breeder);
+
+      const { data: insertData, error: insertError } = await supabase
+        .from('pomsky_listings')
+        .insert({
+          name: request.kennel || 'Pomsky',
+          gender: request.gender || null,
+          pomsky_type: request.pomsky_type || null,
+          markings: request.markings || null,
+          price: request.price_min || null,
+          price_min: request.price_min || null,
+          price_max: request.price_max || null,
+          availability: request.availability || 'available',
+          state: request.state || null,
+          breeder_id: breeder.id,
+          user_id: request.user_id,
+          is_active: true,
+          is_new_litter: request.is_new_litter !== false,
+          is_featured: isFeatured,
+          contact_email: request.contact_email || null,
+          contact_phone: request.contact_phone || null,
+          images: request.images || [],
+          description: request.message || null,
+          puppies_available: request.puppies_available || null
+        });
+
+      if (insertError) {
+        console.error("INSERT ERROR:", insertError);
+        return res.status(400).json({ error: insertError.message });
+      }
     }
 
-    console.log("BREEDER:", breeder);
-
-    // 3. Update request status to approved
+    // 3. Update request status to approved and update blast status
+    const updatePayload = { status: 'approved' };
+    if (request.request_email_blast) {
+      updatePayload.email_blast_sent = true;
+    }
     const { error: updateError } = await supabase
       .from('litter_requests')
-      .update({ status: 'approved' })
+      .update(updatePayload)
       .eq('id', req.params.id);
 
     if (updateError) {
@@ -439,33 +516,8 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       return res.status(400).json({ error: updateError.message });
     }
 
-    // 4. Insert listing
-    const { data: insertData, error: insertError } = await supabase
-      .from('pomsky_listings')
-      .insert({
-        name: request.kennel || 'Pomsky',
-        gender: request.gender || null,
-        pomsky_type: request.pomsky_type || null,
-        markings: request.markings || null,
-        price: request.price_min || null,
-        availability: request.availability || 'available',
-        state: request.state || null,
-        breeder_id: breeder.id,
-        user_id: request.user_id, // ✅ Add missing user_id so it shows in breeder portal
-        is_active: true,
-        is_new_litter: true,
-        contact_email: request.contact_email || null,
-        contact_phone: request.contact_phone || null,
-        images: request.images || []
-      });
-
-    if (insertError) {
-      console.error("INSERT ERROR:", insertError);
-      return res.status(400).json({ error: insertError.message });
-    }
-
-    // Trigger ActiveCampaign automation via tag
-    if (request.contact_email) {
+    // Trigger ActiveCampaign automation via tag (only for new listings)
+    if (request.is_new_litter !== false && request.contact_email) {
       await triggerEmailByTag(
         request.contact_email,
         request.name,
@@ -474,7 +526,7 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
       );
     }
 
-    res.json({ message: 'Approved + listing created' });
+    res.json({ message: request.is_new_litter === false ? 'Blast request approved' : 'Approved + listing created' });
 
   } catch (err) {
     console.error("FULL ERROR:", err);
@@ -487,7 +539,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
   try {
     const { data: request } = await supabase
       .from('litter_requests')
-      .select('name, kennel, contact_email, user_id, gender, pomsky_type, markings, price_min, state')
+      .select('name, kennel, contact_email, user_id, gender, pomsky_type, markings, price_min, state, is_new_litter')
       .eq('id', req.params.id)
       .single();
 
@@ -499,7 +551,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
 
     // Also delete the corresponding listing if it was created on approval
-    if (request) {
+    if (request && request.is_new_litter !== false) {
       let query = supabase
         .from('pomsky_listings')
         .delete()
@@ -522,8 +574,8 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
       }
     }
 
-    // Trigger ActiveCampaign automation via tag
-    if (request?.contact_email) {
+    // Trigger ActiveCampaign automation via tag (only for new listings)
+    if (request?.is_new_litter !== false && request?.contact_email) {
       await triggerEmailByTag(
         request.contact_email,
         request.name,
@@ -532,7 +584,7 @@ router.patch('/litter-requests/:id/reject', adminAuth, async (req, res) => {
       );
     }
 
-    res.json({ message: 'Litter rejected and listing removed from website' });
+    res.json({ message: request?.is_new_litter === false ? 'Blast request rejected' : 'Litter rejected and listing removed from website' });
   } catch (err) {
     console.error('LITTER REJECT ERROR:', err);
     res.status(500).json({ error: 'Server error' });
