@@ -489,7 +489,8 @@ router.patch('/litter-requests/:id/approve', adminAuth, async (req, res) => {
           contact_email: request.contact_email || null,
           contact_phone: request.contact_phone || null,
           images: request.images || [],
-          description: request.message || null
+          description: request.message || null,
+          puppies_available: request.puppies_available || null
         });
 
       if (insertError) {

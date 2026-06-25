@@ -83,7 +83,7 @@ router.get('/', async (req, res) => {
       .select(`
   id, breeder_id, name, gender, pomsky_type, markings, price,
   availability, state, city, country,
-  images, description,
+  images, description, puppies_available,
   contact_email, contact_phone,
   is_featured, is_new_litter, created_at,
   breeder_profiles (
@@ -233,7 +233,7 @@ router.get('/:id', async (req, res) => {
       .from('pomsky_listings')
       .select(`
         id, name, gender, pomsky_type, markings, price,
-        availability, state, city, images,
+        availability, state, city, images, puppies_available,
         contact_email, contact_phone,
         description, birth_date, is_new_litter, created_at,
         breeder_profiles (

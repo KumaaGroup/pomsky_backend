@@ -392,7 +392,7 @@ router.post('/listings', authMiddleware, approvedBreederMiddleware, async (req, 
   const {
     name, gender, pomsky_type, markings,
     price, availability, state, city,
-    images, description, birth_date, is_new_litter
+    images, description, birth_date, is_new_litter, puppies_available
   } = req.body;
 
   // Get breeder profile first
@@ -416,7 +416,8 @@ router.post('/listings', authMiddleware, approvedBreederMiddleware, async (req, 
       state, city,
       images: images || [],
       description, birth_date,
-      is_new_litter: is_new_litter || false
+      is_new_litter: is_new_litter || false,
+      puppies_available: puppies_available ? Number(puppies_available) : null
     })
     .select()
     .single();
@@ -457,7 +458,7 @@ router.patch('/listings/:id', authMiddleware, approvedBreederMiddleware, upload.
   const {
     name, gender, pomsky_type, markings,
     price, availability, state, city,
-    description, is_new_litter,
+    description, is_new_litter, puppies_available,
     existing_images  // JSON string of image URLs to keep
   } = req.body;
 
@@ -490,7 +491,8 @@ router.patch('/listings/:id', authMiddleware, approvedBreederMiddleware, upload.
     availability, state, city,
     images: finalImages,
     description,
-    is_new_litter: is_new_litter === 'true' || is_new_litter === true
+    is_new_litter: is_new_litter === 'true' || is_new_litter === true,
+    puppies_available: puppies_available ? Number(puppies_available) : null
   };
 
   // Strip undefined values so we don't accidentally null out fields
