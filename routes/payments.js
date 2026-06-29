@@ -34,9 +34,9 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
       line_items: [{ price: PRICE_IDS[membership_type], quantity: 1 }],
       // ✅ Breeders go to onboarding, others go to dashboard
       success_url: isBreeder
-        ? `https://pomsky-association.webflow.io/breeders-onboarding-form?payment=success&member=breeder&session_id={CHECKOUT_SESSION_ID}`
-        : `https://pomsky-association.webflow.io/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: 'https://pomsky-association.webflow.io/memberships?payment=cancelled',
+        ? `https://pomskyownersassociation.com//breeders-onboarding-form?payment=success&member=breeder&session_id={CHECKOUT_SESSION_ID}`
+        : `https://pomskyownersassociation.com//dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: 'https://pomskyownersassociation.com//memberships?payment=cancelled',
       customer_email: req.user.email,
       metadata: {
         user_id: req.user.id,
